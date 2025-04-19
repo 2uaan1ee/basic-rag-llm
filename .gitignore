@@ -1,0 +1,8 @@
+.env
+.pkl
+.faiss
+__pycache__/
+.ipynb_checkpoints/
+miai/
+other/
+rag-venv/
