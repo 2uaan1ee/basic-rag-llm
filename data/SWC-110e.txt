@@ -1,0 +1,75 @@
+vulnerable code:
+/*
+ * @source: https://github.com/ConsenSys/evm-analyzer-benchmark-suite
+ * @author: Suhabe Bugrara
+ */
+
+pragma solidity ^0.4.19;
+
+contract AssertMultiTx2 {
+ uint256 private param;
+
+ function AssertMultiTx2(uint256 _param) public {
+ param = 0;
+ }
+
+ function run() {
+ assert(param > 0);
+ }
+
+ function set(uint256 _param) {
+ param = _param;
+ }
+
+
+}
+
+
+Abstract purpose: The code snippet defines a Solidity smart contract named AssertMultiTx2, which includes functions to set a parameter and run assertion checks on it.
+
+Detail Behaviors: 
+1. Constructor function to initialize private parameter.
+2. Function 'run' to assert that the parameter is greater than 0.
+3. Function 'set' to update the parameter value.
+
+fixed code:
+/*
+ * @source: https://github.com/ConsenSys/evm-analyzer-benchmark-suite
+ * @author: Suhabe Bugrara
+ */
+
+pragma solidity ^0.4.19;
+
+contract AssertMultiTx2 {
+ uint256 private param;
+
+ function AssertMultiTx2(uint256 _param) public {
+ param = 0;
+ }
+
+ function run() public {
+ require(param > 0);
+ }
+
+ function set(uint256 _param) public {
+ param = _param;
+ }
+
+}
+
+
+Abstract Vulnerability Description: The vulnerability arises from the inappropriate use of a state-checking mechanism that consumes excessive resources upon failure, where the mechanism should instead be apt for validating user inputs or conditional logic. This improper validation strategy leads to exhaustive resource consumption when triggered, as opposed to an efficient validation method that conserves resources and provides informative error feedback.
+
+Trigger Action: Attempting to execute a state validation operation with a parameter expected to always meet a specific condition, such as ensuring a variable’s value is greater than zero, without adequately using the resource-efficient validation function designed for input validation within the contract's logic.
+
+            Detailed Vulnerability Description: The vulnerability in the original code stems from the use of `assert(param > 0);` in the `run` function. The `assert` statement here is used to ensure that `param` is greater than zero before proceeding. However, if `param` is less than or equal to zero, this will cause an exception which is extensively costly due to the gas consumption behavior of `assert()`. This situation can arise naturally when the contract is initially deployed with `param` set to zero (as per the constructor), leading to a reachable assert statement under normal operating conditions – behavior contrary to the intended use for `assert`.
+
+###
+            Solution Description: The key modification to resolve this vulnerability involves replacing `assert()` with `require()`. The `require(bool expression)` function should be used to validate user inputs and contract state changes. This function is more suitable for these kinds of conditions because it provides a cheaper gas cost than `assert` and more informative error messages. In addition, `require` refunds remaining gas to the caller, distinguishing it as the proper mechanism for input validation: 
+1. Replace `assert(param > 0)` with `require(param > 0)`.
+2. Ensure that conditions under which the function runs are correctly enforced using `require`. 
+
+By using `require`, the execution halts if the condition `param > 0` isn't met, informative error feedback is provided, and the remaining gas is refunded. This practice aligns with the Solidity best practices where `require` is leveraged for user input validation and `assert` is reserved solely for invariants that should never fail.
+
+---
+

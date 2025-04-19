@@ -1,0 +1,102 @@
+vulnerable code:
+pragma solidity ^0.4.24;
+
+contract DeprecatedSimple {
+
+ 
+
+ function useDeprecated() public constant {
+
+ bytes32 blockhash = block.blockhash(0);
+ bytes32 hashofhash = sha3(blockhash);
+
+ uint gas = msg.gas;
+
+ if (gas == 0) {
+ throw;
+ }
+
+ address(this).callcode();
+
+ var a = [1,2,3];
+
+ var (x, y, z) = (false, "test", 0);
+
+ suicide(address(0));
+ }
+
+ function () public {}
+
+}
+
+
+Abstract purpose: The code snippet showcases various deprecated functions and functionalities in a Solidity smart contract.
+
+Detail Behaviors:
+1. Accessing blockhash and sha3 functions that are now deprecated.
+2. Checking and handling gas value, though the syntax `msg.gas` is deprecated.
+3. Using the `callcode()` function which is deprecated.
+4. Declaring arrays using the `var` keyword, which is deprecated.
+5. Defining variables using tuple assignment, which is deprecated.
+6. Executing the 'suicide' function, which is now deprecated and replaced with 'selfdestruct'.
+
+fixed code:
+pragma solidity ^0.4.24;
+
+contract DeprecatedSimpleFixed {
+
+ function useDeprecatedFixed() public view {
+
+ bytes32 bhash = blockhash(0);
+ bytes32 hashofhash = keccak256(bhash);
+
+ uint gas = gasleft();
+
+ if (gas == 0) {
+ revert();
+ }
+
+ address(this).delegatecall();
+
+ uint8[3] memory a = [1,2,3];
+
+ (bool x, string memory y, uint8 z) = (false, "test", 0);
+
+ selfdestruct(address(0));
+ }
+
+ function () external {}
+
+}
+
+
+Abstract Vulnerability Description: The contract utilizes deprecated and insecure functions and operators, which compromises the security and compatibility of the smart contract by potentially exposing it to unintended behaviors or vulnerabilities. Outdated elements such as deprecated hashing functions, gas-related calls, calling mechanisms, and contract termination methods do not align with current standards and pose risks for execution errors, unexpected state changes, and decreased readability.
+
+Trigger Action: The use of deprecated Solidity functions and operators within the smart contract initiates the vulnerability, specifically through outdated methods of generating hashes, calculating gas, calling code in other contracts, and terminating contracts.
+
+            Detailed Vulnerability Description: The original code contains several deprecated elements, each with its own implications for security and compatibility:
+
+1. **Deprecated Functions Usage:**
+   - **`block.blockhash(0)`**: This is deprecated and is replaced with simply `blockhash(0)`, reducing potential confusion and improving clarity and future compatibility.
+   - **`sha3()`**: Previously used in the code for hashing purposes, it is outdated. The recommended function is `keccak256()`, which is essentially the same cryptographic function but properly named according to standards.
+   - **`msg.gas`**: This is deprecated in favor of `gasleft()`, as `msg.gas` does not provide the behavior that was originally expected due to changes in Ethereum's gas calculation mechanism.
+   - **`callcode`**: It is deprecated due to security concerns. Typically, it should be replaced with `delegatecall` to maintain context execution properly, avoiding unexpected state changes.
+
+2. **Unsafe Functions Usage:**
+   - **`suicide`**: The method is renamed to `selfdestruct` for better clarity regarding its purpose—destroying the contract and sending its balance to a specified address. Using `selfdestruct` directly conveys its intention, making the code more readable and less error-prone.
+
+###
+            Solution Description: The contract was modified to improve code safety, readability, and adherence to current Solidity standards:
+
+1. **Current and Safer Function Utilizations:**
+   - **Replaced `block.blockhash(0)` with `blockhash(0)`**: Ensures continued compatibility with Solidity's syntax and semantical updates.
+   - **Replaced `sha3()` with `keccak256()`**: This caters to newer standards while providing the same functionality, ensuring no breakage when the language evolves.
+   - **Replaced `msg.gas` with `gasleft()`**: Provides the amount of gas left properly, allowing the contract to make accurate logic decisions regarding its execution.
+   - **Replaced `callcode` with `delegatecall`**: This maintains the calling context, avoiding unintentionally harmful alterations of the caller’s state.
+
+2. **Improved Terminology:**
+   - **Replaced `suicide` with `selfdestruct`**: Aligns with industry's best practices by using function names that convey their action without ambiguity, reducing the chances of misuse.
+
+3. **Establishing Clear Error Handling:**
+   - **Replaced `throw` with `revert()`**: Provides enhanced error information and control over contract flow, enabling better debugging and user experience.
+

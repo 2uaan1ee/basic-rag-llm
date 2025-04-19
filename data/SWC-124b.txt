@@ -1,0 +1,82 @@
+vulnerable code:
+pragma solidity ^0.4.24;
+
+
+
+contract Map {
+ address public owner;
+ uint256[] map;
+
+ function set(uint256 key, uint256 value) public {
+ if (map.length <= key) {
+ map.length = key + 1;
+ }
+
+ map[key] = value;
+ }
+
+ function get(uint256 key) public view returns (uint256) {
+ return map[key];
+ }
+ function withdraw() public{
+ require(msg.sender == owner);
+ msg.sender.transfer(address(this).balance);
+ }
+}
+
+
+Abstract purpose:
+The purpose of the code snippet is to define a smart contract called "Map" that allows for storing key-value pairs in a dynamic array.
+
+Detail Behaviors: 
+1. The contract allows setting key-value pairs in the map.
+2. It allows retrieving the value associated with a given key.
+3. It provides a function for the owner to withdraw the contract's balance.
+
+fixed code:
+pragma solidity ^0.4.24;
+
+contract Map {
+    address public owner;
+    mapping(uint256 => uint256) private map;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    constructor() public {
+        owner = msg.sender;
+    }
+
+    function set(uint256 key, uint256 value) public {
+        map[key] = value;
+    }
+
+    function get(uint256 key) public view returns (uint256) {
+        return map[key];
+    }
+
+    function withdraw() public onlyOwner {
+        msg.sender.transfer(address(this).balance);
+    }
+}
+
+
+Abstract Vulnerability Description: The identified vulnerability pertains to insecure storage management and insufficient access controls within a smart contract, which allows external entities to manipulate sensitive contract state data. Specifically, it relates to the improper handling of storage mechanisms, such as dynamically sized data structures, which can result in unauthorized overwriting of critical contract details, potentially compromising contract operations and altering ownership data.
+
+Trigger Action: The vulnerability is triggered when an attacker exploits the unprotected write access to a dynamically managed storage structure, such as a dynamically sized array, allowing them to manipulate its size and overwrite critical storage slots without proper authorization checks.
+
+            Detailed Vulnerability Description: The vulnerability identified in the initial smart contract code falls under SWC-124, which deals with the unintended result of unprotected write access to storage. The concern here is primarily about the direct manipulation of the storage location that holds the owner’s address. Initially, the contract employs a dynamically sized array, which allows for potential unauthorized expansion and subsequent overwriting of important contract data due to incorrect key management. More specifically, if `map.length` is set to an arbitrary length by an attacker, they can potentially overwrite important storage slots in the contract, including the slot that holds the `owner` address. This exploitation stems from the fact that the contract uses an unsafe and dynamic array management without strict access control, which can lead to corruption of sensitive data.
+
+###
+            Solution Description: The modified code addresses these vulnerabilities by implementing the following key changes:
+
+1. **Use of Mapping Instead of Array**: The dynamic array has been replaced with a `mapping(uint256 => uint256)`, which inherently manages keys and values, preventing unauthorized manipulation of the storage layout. Mappings prevent modification of their size, effectively tackling the issue of overwriting or unauthorized resizing that was possible with arrays.
+
+2. **Introduction of a Constructor**: A constructor is used to set the owner of the contract upon deployment. By assigning `owner = msg.sender` at deployment, the contract ensures that the deployer account is recognized as the owner immediately, setting a clear demarcation for ownership.
+
+3. **Modifier for Access Control**: A modifier `onlyOwner` is introduced to encapsulate the contract owner check before executing the withdraw function. This ensures that only the rightful owner of the contract can perform critical operations like withdrawing funds, hence securing the contract against unauthorized access attempts.
+
+4. **Detailed Require Message**: The `require` statement now includes an error message, providing clear feedback if unauthorized attempts are made to execute owner-protected functions. This not only aids debugging but also enhances the readability of access constraints within the code.
+

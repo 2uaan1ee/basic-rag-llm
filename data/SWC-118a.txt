@@ -1,0 +1,99 @@
+vulnerable code:
+/*
+ * @source: https://github.com/trailofbits/not-so-smart-contracts/blob/master/wrong_constructor_name/incorrect_constructor.sol
+ * @author: Ben Perez
+ * Modified by Gerhard Wagner
+ */
+
+
+pragma solidity 0.4.24;
+
+contract Missing{
+ address private owner;
+
+ modifier onlyowner {
+ require(msg.sender==owner);
+ _;
+ }
+
+ function missing()
+ public
+ {
+ owner = msg.sender;
+ }
+
+ function () payable {}
+
+ function withdraw()
+ public
+ onlyowner
+ {
+ owner.transfer(this.balance);
+ }
+}
+
+
+Abstract purpose: The purpose of the above code snippet is to define a smart contract that allows an owner to withdraw the contract's balance.
+
+Detail Behaviors: 
+1. Define a missing function to set the owner of the contract.
+2. Define a fallback function to receive Ether.
+3. Define a withdraw function that transfers the contract's balance to the contract owner.
+
+fixed code:
+/*
+ * @source: https://github.com/trailofbits/not-so-smart-contracts/blob/master/wrong_constructor_name/incorrect_constructor.sol
+ * @author: Ben Perez
+ * Modified by Gerhard Wagner
+ */
+
+
+pragma solidity ^0.4.24;
+
+contract Missing{
+ address private owner;
+
+ modifier onlyowner {
+ require(msg.sender==owner);
+ _;
+ }
+
+ constructor()
+ public
+ {
+ owner = msg.sender;
+ }
+
+ function () payable {}
+
+ function withdraw()
+ public
+ onlyowner
+ {
+ owner.transfer(this.balance);
+ }
+}
+
+
+Abstract Vulnerability Description: A misnamed constructor function in older Solidity versions can mistakenly be considered a public function, allowing unauthorized external access to contract initialization processes, which include sensitive operations such as setting critical state variables.
+
+Trigger Action: Invocation of a function with a name similar to but not exactly matching the contract's name, leading to the misinterpretation of intended constructor functionalities as regular, publicly callable functions.
+
+            Detailed Vulnerability Description: 1. **Nature of Vulnerability**: In Solidity versions prior to 0.4.22, constructors were defined by writing a function with the same name as the contract. If a function intended to be a constructor does not exactly match the contract name, it becomes a regular, callable function.
+
+2. **Consequences of Misnamed Constructors**: If a function intended to be a constructor is misnamed, it remains a publicly accessible and callable function. This oversight can lead to anyone being able to call this function after the contract is deployed, allowing unauthorized entities to execute what were meant to be protected, initialization actions, such as setting the contract owner.
+
+3. **Control Flow Analysis**: 
+   - The initial code has a function `missing()` which seems to intend to act as the constructor, but because it is not named exactly like the contract (i.e., `Missing`), it remains a public function. 
+   - This allows any external user to call `missing()` and set themselves as the `owner`, compromising the integrity of the contract's access control.
+
+###
+            Solution Description: 1. **Correct Constructor Declaration**: In the fixed version of the contract, the misnamed constructor `missing()` has been renamed to `constructor()`. This update aligns with proper practice in Solidity versions 0.4.22 and later, ensuring that the constructor is only called once during the deployment of the contract and not exposed as a public function thereafter.
+
+2. **Prevention of Unauthorized Ownership**:
+   - By using `constructor()`, the function is correctly recognized by the Solidity compiler as a constructor, which executes its logic solely at the contract creation stage, thereby securely setting the contract owner.
+   - This update directly prevents unauthorized users from usurping control over the contract’s ownership by invoking what should have been a safeguard initialization procedure.
+
+3. **Verification via Slither**:
+   - The control flow graph (CFG) before and after the fix shows changes that eliminate the vulnerability by restricting the ownership setting action to be performed only once and by the deployer.
+

@@ -1,0 +1,49 @@
+vulnerable code:
+/*
+ * @source: https://github.com/ConsenSys/evm-analyzer-benchmark-suite
+ * @author: Suhabe Bugrara
+ */
+
+pragma solidity ^0.4.19;
+
+contract AssertConstructor {
+ function AssertConstructor() public {
+ assert(false);
+ }
+}
+
+
+Abstract purpose: The purpose of the provided code snippet is to demonstrate a contract with a constructor that triggers an assertion failure.
+
+Detail Behaviors: 
+1. The contract is named `AssertConstructor`.
+2. It has a constructor function with the same name as the contract.
+3. The constructor contains an assertion that always evaluates to false.
+
+fixed code:
+pragma solidity ^0.4.19;
+
+contract AssertConstructor {
+    function AssertConstructor() public {
+        require(false);
+    }
+}
+
+Abstract Vulnerability Description: The vulnerability arises from the misuse of an assert function within a constructor, where the condition is guaranteed to fail, leading to the inability to deploy the smart contract. The assert function, which is intended for checking invariants that must hold true, is improperly applied, causing counterproductive contract creation failure.
+
+Trigger Action: The explicit use of `assert(false)` within the constructor of the contract initiates this vulnerability, resulting in a persistent failure to deploy the contract on the blockchain.
+
+            Detailed Vulnerability Description: The vulnerability present in the original code snippet is identified by the usage of the `assert()` function with an expression that evaluates to `false`. The `assert()` function in Solidity is primarily used to check for conditions that are meant to be always true, serving as a robust check for invariants. Failure of an `assert()` statement typically indicates a critical issue within the contract logic or an unforeseen circumstance, as the intention is for the condition to never evaluate to `false` during the normal course of operations.
+
+Using `assert(false)` in the constructor of a contract ensures that the constructor will always fail, thereby preventing the successful creation of the contract. This is a critical problem, as it makes the contract unusable by design and cannot be instantiated on the blockchain, thus defeating the primary purpose of deploying a contract.
+
+###
+            Solution Description: The modified code snippet addresses the vulnerability by replacing `assert(false)` with `require(false)` within the constructor. The use of `require()` in contrast to `assert()` is significant for several reasons:
+
+1. **Purpose and Context**: `require()` is intended for input validation and preconditions in functions where the failure of the condition is anticipated to be a result of an error in the input or external conditions. It is typically used to enforce conditions that must be met for the function to continue execution.
+
+2. **Gas Refund**: When a `require()` statement fails, it offers a gas refund to the caller, whereas `assert()` consumes all the remaining gas. This makes `require()` a more efficient choice when the failure of the expression is a result of a reasonable and expected bad input or state.
+
+3. **Visibility of Failure**: The Solidity documentation and best practices suggest using `require()` for checks that could realistically fail due to invalid input. It is generally understood by users and developers as a guard clause for expected conditions, rather than invariants.
+
+

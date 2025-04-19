@@ -1,0 +1,113 @@
+vulnerable code:
+pragma solidity ^0.4.25;
+
+contract DosNumber {
+
+ uint numElements = 0;
+ uint[] array;
+
+ function insertNnumbers(uint value,uint numbers) public {
+
+ 
+ for(uint i=0;i<numbers;i++) {
+ if(numElements == array.length) {
+ array.length += 1;
+ }
+ array[numElements++] = value;
+ }
+ }
+
+ function clear() public {
+ require(numElements>1500);
+ numElements = 0;
+ }
+
+ 
+ function clearDOS() public {
+
+ 
+ require(numElements>1500);
+ array = new uint[](0);
+ numElements = 0;
+ }
+
+ function getLengthArray() public view returns(uint) {
+ return numElements;
+ }
+
+ function getRealLengthArray() public view returns(uint) {
+ return array.length;
+ }
+}
+
+
+Abstract purpose: The code snippet defines a Smart Contract named DosNumber that enables users to insert numbers into an array, clear the array, and retrieve information about the array's length.
+
+Detail Behaviors: 
+1. The function insertNnumbers allows users to add a specified number of a given value to the array.
+2. The clear function resets the array length to 0 if the number of elements exceeds 1500.
+3. The clearDOS function completely clears the array's contents and resets the array length to 0.
+4. The getLengthArray function returns the current number of elements in the array.
+5. The getRealLengthArray function returns the total length of the array.
+
+fixed code:
+pragma solidity ^0.4.25;
+
+contract DosNumber {
+    uint numElements = 0;
+    uint[] array;
+
+    function insertNnumbers(uint value, uint numbers) public {
+        require(numbers > 0, "Number of elements must be greater than zero");
+
+        for (uint i = 0; i < numbers; i++) {
+            array.push(value); // Efficiently pushing to the array
+            numElements++;
+        }
+    }
+
+    function clearBatch(uint batchSize) public {
+        require(numElements > 1500, "Not enough elements to clear");
+        require(batchSize > 0, "Batch size must be greater than zero");
+
+        uint deleteCount = batchSize > numElements ? numElements : batchSize;
+        for (uint i = 0; i < deleteCount; i++) {
+            array[numElements - 1] = 0;  
+            numElements--; 
+        }
+
+        if (numElements == 0) {
+            array.length = 0;  // Reduce storage size only when safe
+        }
+    }
+
+    function getLengthArray() public view returns (uint) {
+        return numElements;
+    }
+
+    function getRealLengthArray() public view returns (uint) {
+        return array.length;
+    }
+}
+
+Abstract Vulnerability Description: Inefficient manipulation of dynamic data structures in smart contracts can lead to excessive gas consumption, resulting in denial of service by reaching or exceeding block gas limits. This happens when storage operations, such as appending or clearing a large number of elements, are not optimized for computational efficiency, causing the contract to become un-executable under standard network constraints.
+
+Trigger Action: The vulnerability is triggered when the smart contract attempts to perform high-cost storage operations on dynamic arrays, such as appending numerous elements or clearing large datasets, without using gas-efficient methods that respect the block's gas limit.
+
+            Detailed Vulnerability Description: **
+
+The code snippet in the initial smart contract is vulnerable to a Denial of Service (DoS) through block gas limit exhaustion, categorized under SWC-128. This vulnerability arises from the inefficient manipulation of dynamic arrays within Ethereum smart contracts. Specifically, the contract's `insertNnumbers` function appends elements to an array in a manner that accumulates significant gas costs when `numElements` grows large. The inefficient use of `array.length += 1` results in reallocation and copying of the array in storage, which is computationally expensive and can quickly approach or exceed the block gas limit imposed by the Ethereum network.
+
+Furthermore, the functions intended to clear the array, such as `clear()` and `clearDOS()`, encounter similar pitfalls when dealing with large datasets because resetting or reallocating large segments of storage can similarly gas-lock the contract, making it uncallable until reset conditions are met, creating potential denial of service situations.
+
+**
+            Solution Description: **
+
+The modified version of the contract incorporates patterns to mitigate the gas consumption concerns that lead to the DoS vulnerability:
+
+1. **Optimization of Array Expansion:** The process of adding elements to the array is refined by utilizing `array.push(value)`, which is a more gas-efficient method for increasing array size. Directly pushing values into the array circumvents the need for explicit length adjustments that were previously costly in terms of gas.
+
+2. **Batch Processing and Controlled Resizing:** The modified `clearBatch()` function implements batch processing, providing an incremental approach to clearing the array. It accepts a `batchSize` parameter, allowing the contract to process elements in manageable chunks rather than attempting to clear large amounts of data at once. This significantly reduces the risk of exceeding the block gas limit during operations on large arrays.
+
+3. **Conditional Array Reduction:** After batch deletions, the contract conditionally reduces the storage size of the array by setting `array.length = 0` only if `numElements` reaches zero, hence minimizing unnecessary gas usage associated with frequent storage adjustments.
+

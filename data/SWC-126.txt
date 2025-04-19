@@ -1,0 +1,108 @@
+vulnerable code:
+/*
+ * @source: https://consensys.github.io/smart-contract-best-practices/known_attacks/#insufficient-gas-griefing
+ * @author: ConsenSys Diligence
+ * Modified by Kaden Zipfel
+ */
+
+pragma solidity ^0.5.0;
+
+contract Relayer {
+ uint transactionId;
+
+ struct Tx {
+ bytes data;
+ bool executed;
+ }
+
+ mapping (uint => Tx) transactions;
+
+ function relay(Target target, bytes memory _data) public returns(bool) {
+ 
+ require(transactions[transactionId].executed == false, 'same transaction twice');
+ transactions[transactionId].data = _data;
+ transactions[transactionId].executed = true;
+ transactionId += 1;
+
+ (bool success, ) = address(target).call(abi.encodeWithSignature("execute(bytes)", _data));
+ return success;
+ }
+}
+
+
+contract Target {
+ function execute(bytes memory _data) public {
+ 
+ }
+}
+
+
+Abstract purpose: To implement a relayer smart contract that manages the execution of transactions on a target contract.
+
+Detail Behaviors:
+1. The Relayer contract stores transactions in a mapping and executes them by relaying the data to the Target contract.
+2. Each transaction is marked as executed to prevent duplicate execution.
+3. The relay function calls the execute function on the Target contract using the provided data and returns the success status.
+
+fixed code:
+/*
+ * @source: https://consensys.github.io/smart-contract-best-practices/known_attacks/#insufficient-gas-griefing
+ * @author: ConsenSys Diligence
+ * Modified by Kaden Zipfel
+ */
+
+pragma solidity ^0.5.0;
+
+contract Relayer {
+ uint transactionId;
+
+ struct Tx {
+ bytes data;
+ bool executed;
+ }
+
+ mapping (uint => Tx) transactions;
+
+ function relay(Target target, bytes memory _data, uint _gasLimit) public {
+ 
+ require(transactions[transactionId].executed == false, 'same transaction twice');
+ transactions[transactionId].data = _data;
+ transactions[transactionId].executed = true;
+ transactionId += 1;
+
+ address(target).call(abi.encodeWithSignature("execute(bytes)", _data, _gasLimit));
+ }
+}
+
+
+contract Target {
+ function execute(bytes memory _data, uint _gasLimit) public {
+ require(gasleft() >= _gasLimit, 'not enough gas');
+ 
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability stems from inadequate safeguards against gas limit manipulations, leading to premature halting of sub-call executions. This can allow an adversary to disrupt or censor functions by intentionally causing gas exhaustion during execution, ultimately inducing denial-of-service conditions.
+
+Trigger Action: The initiation occurs when an attacker specifies a gas limit that is sufficient for initial processing but insufficient for the complete execution of a relayed call, leading to an intentional failure in completing the target contract transaction.
+
+            Detailed Vulnerability Description: **
+
+The vulnerability in question pertains to an insufficient gas griefing attack, indexed under SWC-126. Within the context of the provided smart contract, the `Relayer` contract accepts transaction data and subsequently attempts to relay this to a `Target` contract via a low-level `call` function. This introduces a critical risk when the relayed call does not execute successfully due to insufficient gas being provided.
+
+This vulnerability exploits the mechanism of gas usage during a transaction to intentionally cause sub-call failures. By controlling the gas limit, an attacker (often termed as the 'forwarder') can cause the execution of the relay process to halt prematurely within the `Target` contract. If the call fails mid-execution due to depleted gas, it could lead to either a complete transaction revert or continuation, depending on how the relayer is configured. In this specific case, the attack could originate from a transaction where the user submits just enough gas for the relayer's processing but insufficient for the target call. This manipulation can be used censoriously to block transactions, creating a denial-of-service-like condition.
+
+**
+            Solution Description: **
+
+The remedy implemented involves augmenting the `relay` function to include an additional argument, `_gasLimit`. This approach permits the forwarder to specify a minimum gas requirement for executing the target function, which mitigates the risk of failure due to insufficient gas.
+
+In the adjusted implementation:
+
+1. **Signature Addition**: The function signature of the `execute` function in the `Target` contract now necessitates the gas limit (`_gasLimit`) as a parameter.
+
+2. **Pre-check Requirement**: Within the `Target` contract, a `require` statement is added to check if the remaining gas (`gasleft()`) is sufficient, i.e., greater than or equal to `_gasLimit`. If not, the function call is halted with an exception error ('not enough gas').
+
+3. **Gas Limitation Control**: By enabling specification of gas limits directly in the contract's logic, the authors have applied a proactive control to ensure necessary gas availability, thereby reducing griefing opportunities.
+

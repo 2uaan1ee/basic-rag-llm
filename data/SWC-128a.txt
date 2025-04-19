@@ -1,0 +1,114 @@
+vulnerable code:
+pragma solidity ^0.4.25;
+
+contract DosGas {
+
+ address[] creditorAddresses;
+ bool win = false;
+
+ function emptyCreditors() public {
+ if(creditorAddresses.length>1500) {
+ creditorAddresses = new address[](0);
+ win = true;
+ }
+ }
+
+ function addCreditors() public returns (bool) {
+ for(uint i=0;i<350;i++) {
+ creditorAddresses.push(msg.sender);
+ }
+ return true;
+ }
+
+ function iWin() public view returns (bool) {
+ return win;
+ }
+
+ function numberCreditors() public view returns (uint) {
+ return creditorAddresses.length;
+ }
+}
+
+
+Abstract purpose: The smart contract manages a list of creditor addresses and has functions to add creditors, empty the list under certain conditions, check if a win condition is met, and retrieve the number of creditors stored.
+
+Detail Behaviors: 
+1. Function to empty the list of creditors if it exceeds 1500 addresses.
+2. Function to add 350 creditor addresses to the list.
+3. Function to check if a win condition is met.
+4. Function to retrieve the number of creditor addresses stored.
+
+fixed code:
+pragma solidity ^0.4.25;
+
+contract DosGas {
+    address[] creditorAddresses;
+    bool win = false;
+
+    function emptyCreditors(uint batchSize) public {
+        require(batchSize > 0, "Batch size must be greater than zero");
+
+        uint length = creditorAddresses.length;
+        if (length > 1500) {
+            uint deleteCount = batchSize > length ? length : batchSize;
+            for (uint i = 0; i < deleteCount; i++) {
+                creditorAddresses[length - 1] = address(0);  
+                length--; 
+            }
+
+            creditorAddresses.length = length;
+
+            if (creditorAddresses.length == 0) {
+                win = true;
+            }
+        }
+    }
+
+    function addCreditors(uint batchSize) public returns (bool) {
+        require(batchSize > 0, "Batch size must be greater than zero");
+
+        for (uint i = 0; i < batchSize; i++) {
+            creditorAddresses.push(msg.sender);
+        }
+        return true;
+    }
+
+    function iWin() public view returns (bool) {
+        return win;
+    }
+
+    function numberCreditors() public view returns (uint) {
+        return creditorAddresses.length;
+    }
+}
+
+
+Abstract Vulnerability Description: The vulnerability stems from performing unbounded computational operations on large data structures within a function, leading to excessive gas consumption. This can result in a denial of service if the gas required by the operation exceeds the block gas limit, causing transaction reversion.
+
+Trigger Action: Attempting to reset or clear a large data structure, such as an array, in a single transaction without considering the gas limit constraints, thereby initiating potential denial of service due to exceeding the allowed gas threshold.
+
+            Detailed Vulnerability Description: The provided code snippet initially possesses a Denial of Service (DoS) vulnerability due to unbounded gas consumption, commonly categorized under **SWC-128: DoS with Block Gas Limit**. The primary issue stems from potentially expensive operations on the `creditorAddresses` array within the `emptyCreditors` function. 
+
+1. **Unbounded Array Operations**: The original `emptyCreditors` function attempts to reset the `creditorAddresses` array to an empty state if its length exceeds 1500. This operation, `creditorAddresses = new address[](0);`, may require significant gas if the array is large due to a high number of creditors. Given the Ethereum network's block gas limit, this can cause the transaction to revert if it exceeds the allowable gas threshold, effectively causing a denial of service.
+
+2. **Lack of Flexibility**: The original code lacked mechanisms to handle very large arrays efficiently and did not consider optimizing the clearance process, given varying Ethereum block gas limits.
+
+###
+            Solution Description: The improved code introduces a batch processing approach which mitigates the DoS risk by controlling the volume of operations performed in a single transaction, thereby keeping within gas limits.
+
+1. **Batch Size Control**: 
+   - The `emptyCreditors` function is refactored to include a `batchSize` parameter. This allows the batch processing of the `creditorAddresses` array. Instead of attempting to clear the entire array at once, the function empties a specified batch size of elements iteratively, reducing immediate gas expenditure.
+
+2. **Efficient Element Removal**:
+   - Elements are set to `address(0)` iteratively starting from the last index, and the `length` variable is decremented accordingly. This ensures that each operation only affects a portion of the array.
+
+3. **Array Resizing**:
+   - After batch processing, the array's length is explicitly set, further reducing unnecessary memory operations.
+
+4. **Condition Verification**:
+   - The `require` statement ensures that `batchSize` is non-zero, which prevents useless invocation that might not perform any operations while wasting gas.
+
+5. **Win Condition Update**:
+   - The `win` state is only updated after successful clearance of all array elements. This ensures that the flag is not prematurely set, maintaining contract correctness and logic.
+
+

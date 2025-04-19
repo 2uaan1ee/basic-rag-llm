@@ -1,0 +1,73 @@
+vulnerable code:
+pragma solidity ^0.8.0;
+
+contract SecureContract {
+    mapping(address => bool) public authorizedUsers;
+
+    function verifySignature(address user) public {
+        require(user == msg.sender, "Unauthorized user");
+        authorizedUsers[user] = true;
+    }
+}
+
+Abstract purpose: Implementing a secure contract with authorized user verification.
+
+Detail Behaviors: 
+1. Maintain a mapping of authorized users.
+2. verifySignature function to verify and authorize a user based on the sender's address.
+
+fixed code:
+pragma solidity ^0.8.0;
+
+contract SecureContract {
+    mapping(address => bool) public authorizedUsers;
+
+    function verifySignature(bytes32 hash, bytes memory signature) public {
+        address signer = recoverSigner(hash, signature);
+        require(signer != address(0), "Invalid signature");
+        authorizedUsers[signer] = true;
+    }
+
+    function recoverSigner(bytes32 hash, bytes memory signature) internal pure returns (address) {
+        require(signature.length == 65, "Invalid signature length");
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+
+        assembly {
+            r := mload(add(signature, 32))
+            s := mload(add(signature, 64))
+            v := byte(0, mload(add(signature, 96)))
+        }
+
+        if (v < 27) {
+            v += 27;
+        }
+
+        require(v == 27 || v == 28, "Invalid signature version");
+
+        return ecrecover(hash, v, r, s);
+    }
+}
+
+Abstract Vulnerability Description: The vulnerability arises from inadequate validation of transaction origin in scenarios involving user action verification within smart contracts. The contract naively trusts the immediate sender (transaction initiator) for authentication purposes, lacking robust off-chain signature verification. This opens the door for unauthorized parties to execute actions or gain access by impersonating legitimate entities through intermediary services, such as transaction relayers or proxies, without legitimate cryptographic validation of their rights.
+
+Trigger Action: The vulnerability is triggered when the contract relies solely on `msg.sender` for identity verification, trusting the transaction initiator without employing cryptographic signature validation to substantiate the authenticity of the sender's claim or intent.
+
+            Detailed Vulnerability Description: The vulnerability labeled SWC-122 relates to improper signature handling in smart contracts. In the original implementation, the function `verifySignature` relies only on `msg.sender` to verify the authenticity of a user, without any cryptographic validation. This assumes that the sender of the transaction is indeed the rightful owner (or originator) of the intended action. However, in environments where intermediaries, like transaction relayers or proxies, are utilized, this assumption becomes invalid since `msg.sender` can be different from the original signer. This leads to a potential attack vector where an unauthorized party could falsely claim permissions or access by merely sending a transaction, thereby bypassing user intent verification that would otherwise be cryptographically secured.
+
+###
+            Solution Description: To properly secure the contract, a mechanism to correctly verify off-chain signatures was introduced. The fixed version of the code includes a function `recoverSigner` that employs the `ecrecover` functionality. Here's how the solution works:
+
+1. **Signature Decoding**: The code extracts `r`, `s`, and `v` components from the provided signature using inline assembly. This conforms with the Ethereum signature standard.
+
+2. **Signature Length Check**: It verifies that the signature length is exactly 65 bytes, consistent with Ethereum's signature format.
+
+3. **Signature Validity Check**: The version `v` is ensured to be either 27 or 28, as those are the acceptable values for the signature's version field, ensuring it's properly formatted.
+
+4. **Recover Signer**: Using `ecrecover`, the actual origin address of the transaction, from the signature, is computed, thus enabling cryptographic proof of the signer's intent.
+
+5. **Authorization**: The code concludes by setting the signer's address as authorized if and only if the signature is verified and valid.
+
+By moving away from `msg.sender` to cryptographic verification, the smart contract securely confirms the user's interactions, safeguarding the system against unauthorized actions during transaction forwarding or proxy usage. This robust approach ensures that only entities with the actual private key corresponding to a legitimate address can authorize actions, cementing user trust and systemic integrity.

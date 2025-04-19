@@ -1,0 +1,94 @@
+vulnerable code:
+/*
+ * @source: https://capturetheether.com/challenges/lotteries/guess-the-random-number/
+ * @author: Steve Marx
+ */
+
+pragma solidity ^0.4.21;
+
+contract GuessTheRandomNumberChallenge {
+ uint8 answer;
+
+ function GuessTheRandomNumberChallenge() public payable {
+ require(msg.value == 1 ether);
+ answer = uint8(keccak256(block.blockhash(block.number - 1), now));
+ }
+
+ function isComplete() public view returns (bool) {
+ return address(this).balance == 0;
+ }
+
+ function guess(uint8 n) public payable {
+ require(msg.value == 1 ether);
+
+ if (n == answer) {
+ msg.sender.transfer(2 ether);
+ }
+ }
+}
+
+
+Abstract purpose: To create a contract for a Guess The Random Number challenge.
+
+Detail Behaviors: 
+1. Constructor function sets the answer based on the previous block's hash and current timestamp.
+2. isComplete function returns true if the contract balance is 0.
+3. guess function allows users to guess a number, and if correct, they receive double the ether they sent.
+
+fixed code:
+/*
+ * @source: https://capturetheether.com/challenges/lotteries/guess-the-random-number/
+ * @author: Steve Marx
+ */
+
+pragma solidity ^0.4.25;
+
+contract GuessTheRandomNumberChallenge {
+ uint8 answer;
+ uint8 commitedGuess;
+ uint commitBlock;
+ address guesser;
+
+ function GuessTheRandomNumberChallenge() public payable {
+ require(msg.value == 1 ether);
+ }
+
+ function isComplete() public view returns (bool) {
+ return address(this).balance == 0;
+ }
+
+ 
+ function guess(uint8 _guess) public payable {
+ require(msg.value == 1 ether);
+ commitedGuess = _guess;
+ commitBlock = block.number;
+ guesser = msg.sender;
+ }
+ function recover() public {
+ 
+ require(block.number > commitBlock + 20 && commitBlock+20 > block.number - 256);
+ require(guesser == msg.sender);
+
+ if(uint(blockhash(commitBlock+20)) == commitedGuess){
+ msg.sender.transfer(2 ether);
+ }
+ }
+}
+
+
+Abstract Vulnerability Description: The smart contract employs insecure sources for pseudo-random number generation by utilizing elements easily influenced by consensus participants such as block hash and timestamp. This exposes the contract to potential manipulation by parties with vested interests, particularly those with the capacity to influence block characteristics, compromising the integrity of any operations relying on randomness.
+
+Trigger Action: Initiating randomness computation using on-chain variables like `blockhash` and `block.timestamp`, which can be manipulated or influenced by miners.
+
+            Detailed Vulnerability Description: The vulnerability in the original smart contract arises from the use of weak sources of randomness to generate a random number. Specifically, the contract utilizes `block.blockhash` and `now` (current block timestamp) in combination with the `keccak256` hash function to generate a random number. This approach is inherently insecure due to the following reasons:
+- **Block Hash Dependency:** `block.blockhash` allows miners to influence the generated random number within the current and past 256 blocks, as miners can selectively choose a blockhash that benefits them, given enough computational power.
+- **Timestamp Manipulation:** The use of `now` (or `block.timestamp`) can be slightly manipulated by miners, offering them another vector to affect the random number generation.
+
+In essence, by using these two elements, the random number produced is susceptible to manipulation by a malicious miner, particularly in high-stakes situations when they have the resources to affect several blocks.
+
+###
+            Solution Description: The revised contract addresses these issues through a more secure commit-reveal scheme that eliminates direct dependence on on-chain data manipulation for randomness:
+- **Two-Step Process (Commit-Reveal):** The solution involves separating the guess submission and the outcome verification into two distinct steps. During the `guess` function, users commit their guess by storing the guess and block number without immediate outcome determination.
+- **Delayed Blockhash Verification:** The `recover` function checks a blockhash from 20 blocks after the original guess was committed. As `blockhash` is only available for the last 256 blocks, it ensures that the miner cannot manipulate the blockhash after it has been committed and requires the player to recover within this window.
+- **Guarantee of Guess Ownership:** The contract verifies that only the original guesser can attempt to recover by comparing their address with the stored `guesser` address.
+

@@ -1,0 +1,92 @@
+vulnerable code:
+/*
+ * @source: https://github.com/ConsenSys/evm-analyzer-benchmark-suite
+ * @author: Suhabe Bugrara
+ */
+
+
+
+
+pragma solidity ^0.4.23;
+
+contract IntegerOverflowMultiTxOneFuncInfeasible {
+ uint256 private initialized = 0;
+ uint256 public count = 1;
+
+ function run(uint256 input) public {
+ if (initialized == 0) {
+ return;
+ }
+
+ count -= input;
+ }
+}
+
+
+Abstract purpose: Smart contract to demonstrate integer underflow vulnerability.
+
+Detail Behaviors:
+1. Initialize private variable 'initialized' to 0.
+2. Initialize public variable 'count' to 1.
+3. Function 'run' performs subtraction from 'count' by 'input', with a check on 'initialized' being 0.
+
+fixed code:
+/*
+ * @source: https://github.com/ConsenSys/evm-analyzer-benchmark-suite
+ * @author: Suhabe Bugrara
+ * @fix: Prevent integer underflow in run() function
+ */
+
+pragma solidity ^0.4.23;
+
+library SafeMath {
+ function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b <= a, "Integer underflow");
+ return a - b;
+ }
+}
+
+contract IntegerOverflowMultiTxOneFuncInfeasible {
+ using SafeMath for uint256;
+
+ uint256 private initialized = 0;
+ uint256 public count = 1;
+
+ function run(uint256 input) public {
+ if (initialized == 0) {
+ return;
+ }
+
+ count = count.sub(input);
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability involves the lack of safeguards in arithmetic operations, specifically subtraction, which can result in an arithmetic underflow when a subtracted value exceeds the current state variable, leading to unexpected behavior and potentially allowing unauthorized state manipulation.
+
+Trigger Action: Subtraction of a user-provided value from a state variable without validating that the value is within permissible bounds, specifically when the value is greater than the state variable, resulting in an underflow.
+
+            Detailed Vulnerability Description: The vulnerability in question pertains to an arithmetic underflow occurring in a Solidity smart contract. Specifically, the issue arises within the `run` function of the `IntegerOverflowMultiTxOneFuncInfeasible` contract. In its initial code form, the function attempts to subtract a user-provided `input` from the `count` state variable:
+
+```solidity
+count -= input;
+```
+
+Since the function does not verify whether `input` is less than or equal to `count`, an underflow can occur if `input` is greater than `count`. This behavior is undesired in Ethereum smart contracts as it could lead to unexpected contract states, potentially allowing malicious actors to manipulate the `count` value to their advantage, fundamentally breaking the contract's intended functionality. 
+
+###
+            Solution Description: The solution implemented employs Solidity's `SafeMath` library—a well-established defensive programming paradigm to protect against overflows and underflows in arithmetic operations. This is accomplished via:
+
+1. **SafeMath Integration:**
+   - The `SafeMath` library is incorporated into the contract, providing functions that wrap standard arithmetic operations with logic ensuring no overflow or underflow occurs.
+
+2. **Subtraction with Safety Checks:**
+   - The subtraction operation is replaced by the safe subtraction function `sub` from `SafeMath`, which includes a check that ensures `b <= a`. If this condition is violated, it triggers an exception with an error message ("Integer underflow"), thus preventing the function from proceeding into a potentially erroneous state:
+
+```solidity
+count = count.sub(input);
+```
+
+3. **Error Notification:**
+   - The use of `require()` not only prevents underflow but also provides clear feedback about why the function failed, enhancing contract robustness and usability.
+

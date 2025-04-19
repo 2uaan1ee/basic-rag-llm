@@ -1,0 +1,52 @@
+vulnerable code:
+pragma solidity ^0.8.0;
+
+contract SignatureReplay {
+    address public owner;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function verifySignature(bytes32 messageHash, uint8 v, bytes32 r, bytes32 s) public view returns (bool) {
+        address signer = ecrecover(messageHash, v, r, s);
+        return signer == owner;
+    }
+}
+
+Abstract purpose: Smart contract for verifying signatures to prevent replay attacks.
+
+Detail Behaviors: 
+1. Assigns the deploying address as the owner of the contract.
+2. Includes a function to verify a signature using ECDSA.
+
+
+fixed code:
+pragma solidity ^0.8.0;
+
+contract SignatureReplay {
+    address public owner;
+    mapping(bytes32 => bool) public usedHashes;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function verifySignature(bytes32 messageHash, uint8 v, bytes32 r, bytes32 s) public returns (bool) {
+        require(!usedHashes[messageHash], "Replay attack detected!");
+        bytes32 prefixedHash = keccak256(abi.encodePacked(address(this), messageHash));
+        address signer = ecrecover(prefixedHash, v, r, s);
+        if (signer == owner) {
+            usedHashes[messageHash] = true;
+            return true;
+        }
+        return false;
+    }
+}
+
+Abstract Vulnerability Description: The vulnerability involves the potential for signature replay attacks, where the lack of tracking mechanisms for processed message hashes allows for the repeated execution of identical transactions. This stems from the failure to ensure that each signature and its associated message hash is processed a single time, making the contract susceptible to unauthorized repetition of actions through signature reutilization.
+
+Trigger Action: The vulnerability is initiated when a valid signature for a transaction is resent or replayed, taking advantage of the fact that the contract does not verify the uniqueness of the message hash for each signature, thus allowing repetitive processing of the same transaction.
+
+            Detailed Vulnerability Description: The vulnerability identified in the original smart contract code is related to Signature Replay Attacks, denoted by SWC-121. The core issue arises from the absence of a mechanism to track and prevent the reuse of message hashes that have already been processed. In scenarios where a contract verifies signatures to enhance usability or conserve gas, failing to track processed message hashes allows a malicious actor to resend the same transaction multiple times. The verification logic in the original code checks if the signature was created by the owner but does not ensure that each message hash is unique and processed only once. Consequently, if a signature is valid, an attacker could exploit this weakness to perform unauthorized repetitive actions by replaying the same signature.
+            Solution Description: To resolve the vulnerability, a mapping called `usedHashes` is introduced to keep track of all message hashes that have been processed and verified. The function `verifySignature` is modified to first verify if the given `messageHash` has already been utilized by checking the mapping `usedHashes`. This is enforced through a `require` statement, which halts contract execution and reverts the transaction if the hash has been used, with the error message "Replay attack detected!". Additionally, the code constructs a `prefixedHash` by concatenating the contract's address and the incoming `messageHash`, and then computes a keccak256 hash of the result. This prefixed hash helps ensure that the signature verification is bound to the specific contract instance, adding another layer of security against potential attacks. The rest of the logic follows: if the signature is verified to be from the owner, the `messageHash` is recorded in the `usedHashes` mapping as true and the function returns true, ensuring no future reuse. This systematic approach effectively prevents the replay of previously authenticated messages, thereby securing the contract against replay attacks.

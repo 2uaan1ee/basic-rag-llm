@@ -1,0 +1,54 @@
+vulnerable code:
+pragma solidity ^0.4.25;
+
+contract TypoOneCommand {
+ uint numberOne = 1;
+
+ function alwaysOne() public {
+ numberOne =+ 1;
+ }
+}
+
+
+Abstract purpose: The purpose of the code snippet is to define a smart contract called TypoOneCommand with a variable numberOne initialized to 1 and a function alwaysOne that increments the value of numberOne by 1.
+
+Detail Behaviors: 
+1. Initialize variable numberOne to 1.
+2. Define a function alwaysOne that increments the value of numberOne by 1.
+
+fixed code:
+pragma solidity ^0.4.25;
+
+contract TypoOneCommand {
+    uint numberOne = 1;
+
+    function alwaysOne() public {
+        numberOne += 1;
+    }
+}
+
+
+Abstract Vulnerability Description: The vulnerability arises from the misuse of a syntactically valid expression that inadvertently causes unintended logic due to a typographical error. Specifically, the use of an incorrect arithmetic operator leads to the constant reinitialization of a state variable, rather than its intended incrementation, resulting in logical errors and state mismanagement within the smart contract.
+
+Trigger Action: Invocation of a function where an arithmetic assignment operator is incorrectly used, causing state variables to revert to a default value rather than being incremented as intended.
+
+            Detailed Vulnerability Description: **
+
+The code snippet originally contained a typographical error at line 6: `numberOne =+ 1;`. This is intended to increment `numberOne` by 1, but due to the erroneous use of the `=+` operator, it instead reassigns the variable `numberOne` with the value `+1` (which is essentially `1`). 
+
+This is a subtle error because the typo—using `=+` instead of `+=`—results in a valid, but incorrect, Solidity expression. The unary `+` operator applied before the integer `1` evaluates to `1`, and thus reinitializes the variable `numberOne` to `1` every time the function `alwaysOne()` is called. This behavior effectively neutralizes any previous increments to `numberOne` by perpetually setting it back to `1`.
+
+The inadvertent use of syntactically valid code that performs an unintended logic (reinitialization rather than incrementation) signifies the vulnerability SWC-129, specifically involving typographical errors that pass unnoticed during compilation.
+
+**
+            Solution Description: **
+
+The resolution involved correcting the typo by replacing the expression `numberOne =+ 1;` with `numberOne += 1;`. 
+
+The `+=` operator is the intended increment operator, which appropriately adds `1` to the current value of `numberOne`, rather than reassigning it. The revised code correctly reflects the intended logic that preserves and incrementally increases the state of `numberOne` each time the function `alwaysOne()` is invoked. 
+
+This modification corrects the control flow graph (CFG) and maintains the intended logic, which manipulates the state variable `numberOne` as expected, demonstrating an accumulation pattern on subsequent function invocations rather than errant reinitialization.
+
+Thus, the crux of the solution is the precise use of the correct arithmetic assignment operator to ensure cumulative state progression, eliminating the logical redundancy due to typographical oversight in the original code.
+
+By rectifying typographic errors and leveraging explicit compound assignment operators like `+=`, developers can ensure that state mutations reflect the desired computational logic, effectively eliminating this category of vulnerability. Such diligence prevents the creation of code that behaves unexpectedly while syntactically validating during compilation.

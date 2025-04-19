@@ -1,0 +1,67 @@
+vulnerable code:
+pragma solidity ^0.4.24;
+
+contract Proxy {
+
+ address owner;
+
+ constructor() public {
+ owner = msg.sender; 
+ }
+
+ function forward(address callee, bytes _data) public {
+ require(callee.delegatecall(_data));
+ }
+
+}
+
+
+Abstract purpose:
+This code snippet defines a Proxy smart contract with a function to forward calls to another contract using delegatecall.
+
+Detail Behaviors:
+1. Set the owner of the Proxy contract to the address of the deployer.
+2. Define a function to forward calls to the specified address using delegatecall.
+
+fixed code:
+pragma solidity ^0.4.24;
+
+contract Proxy {
+
+ address callee;
+ address owner;
+
+ modifier onlyOwner {
+ require(msg.sender == owner);
+ _;
+ }
+
+ constructor() public {
+ callee = address(0x0);
+ owner = msg.sender;
+ }
+
+ function setCallee(address newCallee) public onlyOwner {
+ callee = newCallee;
+ }
+
+ function forward(bytes _data) public {
+ require(callee.delegatecall(_data));
+ }
+
+}
+
+
+Abstract Vulnerability Description: The vulnerability involves utilizing an execution transfer mechanism that maintains the executing contract’s context without implementing sufficient access controls and validation checks on the target address, allowing unauthorized external code execution that can manipulate contract state and storage unpredictably.
+
+Trigger Action: Initiating an execution function call to an unverified and potentially malicious target address without adequate access restrictions.
+
+
+            Detailed Vulnerability Description: **
+
+The vulnerability present in the initial smart contract relates to the use of the `delegatecall` function without proper access control and target address validation. `delegatecall` is a special type of low-level call that transfers execution to a target address while keeping the storage and context of the calling contract intact. This means that any function executed via `delegatecall` can manipulate the state and storage of the original contract, posing a significant security risk if the target contract is not trusted. In the original code, the `forward` function exposes this vulnerability by allowing arbitrary code execution at a target address (`callee`) without any restrictions or validation, thereby enabling potential malicious actors to execute harmful code and change vital state variables like the owner's address or even siphon funds away.
+
+**
+            Solution Description: **
+
+The modification made addresses the aforementioned vulnerability by implementing structured access control and validation measures. Firstly, the `Proxy` contract introduces an `onlyOwner` modifier that ensures only the contract owner can change the target `callee` address using the `setCallee` function. This prevents unauthorized entities from manipulating the `callee` address to point to malicious contracts. By enforcing such checks, the contract ensures that only trusted external contracts are referenced, significantly reducing the risk window associated with untrusted code execution via `delegatecall`. Overall, the solution's core lies in tightening access controls and instating proper authorization on sensitive operations like changing addresses, which can lead to severe unintended execution contexts.

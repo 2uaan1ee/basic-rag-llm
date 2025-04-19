@@ -1,0 +1,87 @@
+vulnerable code:
+pragma solidity >=0.5.0;
+pragma experimental ABIEncoderV2;
+
+import "./base.sol";
+
+contract DerivedA is Base {
+ 
+ A i = A(1);
+
+ int internal j = 500;
+
+ function call(int a) public {
+ assign1(a);
+ }
+
+ function assign3(A memory x) public returns (uint) {
+ return g[1] + x.a + uint(j);
+ }
+
+ function ret() public returns (int){
+ return this.e();
+
+ }
+
+}
+
+
+Abstract purpose: 
+The code snippet showcases a Solidity smart contract that inherits from a base contract and includes functions related to calling, assignment, and returning values.
+
+Detail Behaviors: 
+1. The contract instantiates an object of type A with a value of 1.
+2. It initializes an internal integer variable j with a value of 500.
+3. It includes a public function call which calls the assign1 function with an integer parameter.
+4. It includes a public function assign3 that receives a memory reference to an object of type A and returns the sum of element 'a' of the object, the value stored at index 1 of an internal array g, and the integer variable j.
+5. It includes a public function ret that returns the result of calling the function e in the current contract.
+
+fixed code:
+pragma solidity >=0.5.0;
+pragma experimental ABIEncoderV2;
+
+import "./base_fixed.sol";
+
+contract DerivedA is Base {
+
+ int internal j = 500;
+
+ function call(int a) public {
+ assign1(a);
+ }
+
+ function assign3(A memory x) public returns (uint) {
+ return g[1] + x.a + uint(j);
+ }
+
+ function ret() public returns (int){
+ return this.e();
+
+ }
+
+}
+
+
+Abstract Vulnerability Description: The vulnerability pertains to the presence of unused variables, which, although they do not directly compromise contract security, can lead to increased complexity and confusion. Removing such variables improves code clarity and maintainability by preventing unnecessary storage usage and computational overhead, thereby optimizing the readability and audability of the contract.
+
+Trigger Action: The vulnerability is triggered by declaring and initializing variables that are not utilized within the contract logic, leading to potential developer misunderstandings and inefficiencies in contract performance.
+
+            Detailed Vulnerability Description: **
+
+In the initial code provided, we encounter a local instance of the contract `A` initialized within `DerivedA`, which is denoted as an unused variable `i`. While this does not lead to a direct security flaw, having unused variables can result in unnecessary usage of storage or computations and may also lead to potential confusion among developers who may attempt to discern their purpose or usage in the contract's logic. Such clutter can complicate the understanding and auditing of smart contracts.
+
+The control flow graph highlights other logic outside the main context of `DerivedA`, dealing with a guessing game. Variables such as `_secretNumber`, `p`, and certain expressions and behaviors are part of an external logic illustration, likely meant to represent typical code logic, including constraint checks, prize transfers, and ownership assertions. 
+
+**
+            Solution Description: **
+
+To remediate the unused variable vulnerability, the variable `i` (of type `A`) has been successfully removed in the fixed version of the contract. By eliminating unused variables, the revised code achieves better clarity, maintains efficiency, and reduces potential misinterpretations about the roles of such variables. This cleaning up process is integral to writing optimized and understandable smart contracts.
+
+The modified control flow indicates a more reliable and readable series of statements and checks. Specifically:
+
+- The `require` statements have been enhanced with more descriptive revert messages, improving the contract's usability, aiding developers and users in understanding any constraints directly from the rejection messages.
+
+- The `prize` variable replaces `p`, reflecting a more semantically clear variable name, thus enhancing the readability of the balance-handling logic.
+
+- Emit messages are now capitalized (`Success`, `WrongNumber`), adhering to solidity conventions for events, offering an improved communication pattern for emitted events.
+

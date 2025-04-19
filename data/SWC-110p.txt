@@ -1,0 +1,67 @@
+vulnerable code:
+pragma solidity ^0.4.22;
+
+contract TwoMappings{
+
+ mapping(uint=>uint) m;
+ mapping(uint=>uint) n;
+
+ constructor(){
+ m[10] = 100;
+ }
+
+ function check(uint a){
+ assert(n[a] == 0);
+ }
+
+}
+
+
+Abstract purpose: The code snippet defines a Solidity smart contract with two mappings and a constructor that initializes one of the mappings.
+
+Detail Behaviors: 
+1. Define two mappings: `m` and `n`.
+2. Initialize `m[10]` to 100 in the constructor.
+3. Implement a function `check(uint a)` that asserts `n[a]` is equal to 0.
+
+fixed code:
+pragma solidity ^0.4.22;
+
+contract TwoMappings {
+
+    mapping(uint => uint) m;
+    mapping(uint => uint) n;
+
+    constructor() public {
+        m[10] = 100;
+    }
+
+    function check(uint a) public {
+        require(n[a] == 0, "Condition failed");
+    }
+}
+
+Abstract Vulnerability Description: The vulnerability pertains to the inappropriate application of an internal error-checking function, which leads to inefficient resource utilization and potential silent transaction failures when validating state conditions influenced by external state changes. The misuse involves employing an assertion mechanism for state validations that can inherently fail due to dynamic interactions and previous operations, thereby consuming unnecessary computational resources without providing feedback.
+
+Trigger Action: The specific action that initiates the vulnerability is the execution of an assertion function to check a mutable state condition, potentially resulting in the failure of the transaction and the exhaustion of allocated computational gas without informative feedback to the user.
+
+            Detailed Vulnerability Description: The original vulnerability in the code snippet relates to the incorrect use of the `assert()` function in Solidity:
+
+1. **Purpose of `assert()`:** The `assert()` function in Solidity is intended to be used for conditions that should never fail. It is primarily a mechanism for internal error detection, typically used for verifying invariants within your code logic and ensuring that certain unreachable conditions do not occur.
+
+2. **Faulty Usage:** In the original code, the `assert()` function checks a state condition - specifically, that a mapping value is zero (`n[a] == 0`). If this assertion fails, it usually means there's a logical flaw in the contract. However, in actual practice, if an external condition checks a state variable, failures can arise due to state changes made by previous operations, either by the user or the smart contract's own logic.
+
+3. **Consequences of Misuse:** When `assert()` fails, it consumes all gas provided to the contract call. This can lead to excessive resource waste and serves no practical benefit to the user except for failing the transaction silently.
+
+###
+            Solution Description: The fix involves replacing the `assert()` statement with a `require()` function call:
+
+1. **Purpose of `require()`:** The `require()` function is meant to validate inputs and conditions that involve external code and state, which are expected to possibly fail during normal operation. It allows you to specify conditions that must be true for the execution to proceed. If they are not met, the invocation fails gracefully by reverting any state changes without consuming all gas.
+
+2. **Implementation Change:** 
+   - The revised code uses `require(n[a] == 0, "Condition failed")`. This checks the same condition as before but does so in a more user-friendly and resource-efficient manner. The `require()` function reverts the current call and provides a revert message "Condition failed" if `n[a]` is not zero, ensuring that the transaction can fail gracefully with a clear reason.
+
+3. **Benefits of Using `require()`:** 
+   - Improved gas refunding mechanism: When `require()` conditions are not met, the gas used during execution is capped by the remaining gas, yet leveraging the refund mechanism to optimize cost efficiency.
+   - Enhanced user feedback: Provides error message outputs that enhance debugging processes and user transparency.
+

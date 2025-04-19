@@ -1,0 +1,68 @@
+vulnerable code:
+pragma solidity 0.4.24;
+
+contract Overflow_Add {
+ uint public balance = 1;
+
+ function add(uint256 deposit) public {
+ balance += deposit;
+ }
+}
+
+
+Abstract purpose: The code snippet creates a Smart Contract called Overflow_Add with a function to add deposits to the balance variable.
+
+Detail Behaviors:
+1. Initialize the balance variable with a value of 1.
+2. Define a function named add that takes a uint256 parameter deposit and adds it to the balance variable.
+
+fixed code:
+pragma solidity ^0.4.24;
+
+contract Overflow_Add {
+ uint public balance = 1;
+
+ function add(uint256 deposit) public {
+ balance = add(balance, deposit);
+ }
+
+ 
+ function add(uint256 a, uint256 b) internal pure returns (uint256) {
+ uint256 c = a + b;
+ require(c >= a);
+
+ return c;
+ }
+}
+
+
+Abstract Vulnerability Description: The smart contract is susceptible to an arithmetic overflow vulnerability, which occurs when the results of arithmetic operations exceed the data type's storage capacity, leading to unexpected wraparound behavior. This is due to performing unchecked arithmetic operations, particularly in environments or language versions where automatic overflow protections are absent, thereby risking asset integrity and execution logic correctness.
+
+Trigger Action: The vulnerability is triggered when performing a direct arithmetic addition operation, such as incrementing a balance variable with a deposit value, without implementing safeguards to ensure the operation results remain within the allowable range of the data type used.
+
+            Detailed Vulnerability Description: **
+
+The original code snippet suffers from an arithmetic overflow vulnerability, identified by the SWC-101 tag. This vulnerability arises when a smart contract performs arithmetic operations that exceed the size limits of the data types used, which in this case is the `uint256` type. The `add` function directly increments the `balance` state variable by the `deposit` value without checking if the result of `balance + deposit` would overflow beyond the maximum value that `uint256` can hold, which is \(2^{256} - 1\). Should the sum exceed this limit, it wraps around to zero due to the nature of arithmetic in Solidity versions prior to 0.8, leading to potential loss of funds or unintended execution flows in the smart contract.
+
+**Specific Behavior Leading to the Vulnerability:**
+
+1. **Direct Arithmetic Operations:** The `balance += deposit` operation in the `add` function is vulnerable to overflow, as it does not include any built-in safety checks to ensure that the addition does not exceed the maximum `uint256` value.
+
+2. **Lack of Overflow Checking:** In Solidity versions before 0.8, arithmetic operations do not automatically revert on overflow, hence not using explicit checks or safe math libraries will result in potential vulnerabilities.
+
+**
+            Solution Description: **
+
+To mitigate the overflow vulnerability, the modified code introduces an internal addition function with safeguard mechanisms. This function handles the arithmetic operation within a controlled environment.
+
+1. **Controlled Arithmetic with Checks:** The modified `add` function encapsulates the addition operation, requiring that the resultant sum `c` is greater than or equal to the initial value `a` before proceeding. This is implemented using Solidity's `require` statement, effectively preventing overflow by ensuring that the operation is mathematically sound.
+
+    ```solidity
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a + b;
+        require(c >= a);
+        return c;
+    }
+    ```
+
+2. **Use of Safe Math Approaches:** Implementing safeguards around arithmetic operations is crucial. The modified solution manually includes an overflow check with the `require` statement. This protection strategy was more commonly implemented using libraries such as OpenZeppelin's SafeMath in pre-0.8 Solidity environments, where such checks were industry-standard practice to secure arithmetic expressions.

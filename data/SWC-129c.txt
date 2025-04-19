@@ -1,0 +1,70 @@
+vulnerable code:
+pragma solidity ^0.4.25;
+
+contract TypoSimple {
+
+ uint onlyOne = 1;
+ bool win = false;
+
+ function addOne() public {
+ onlyOne =+ 1;
+ if(onlyOne>1) {
+ win = true;
+ }
+ }
+
+ function iWin() view public returns (bool) {
+ return win;
+ }
+}
+
+
+Abstract purpose: Smart contract to allow a user to increment a number and set a win flag if the number exceeds 1.
+
+Detail Behaviors: 
+1. A variable `onlyOne` is initialized to 1.
+2. A boolean variable `win` is set to false.
+3. The `addOne` function increments `onlyOne` and sets `win` to true if `onlyOne` exceeds 1.
+4. The `iWin` function allows external users to check the value of the `win` variable.
+
+
+fixed code:
+pragma solidity ^0.4.25;
+
+contract TypoSimple {
+
+ uint onlyOne = 1;
+ bool win = false;
+
+ function addOne() public {
+ onlyOne += 1;
+ if(onlyOne > 1) {
+ win = true;
+ }
+ }
+
+ function iWin() view public returns (bool) {
+ return win;
+ }
+}
+
+
+Abstract Vulnerability Description: A logical error due to a typographical mistake in the arithmetic operation leads to an incorrect state update within the smart contract's control flow. Instead of continuously modifying a counter variable to track cumulative actions, an improper assignment operation consistently resets the variable, preventing the intended execution of logic based on threshold conditions.
+
+Trigger Action: The vulnerability is triggered when the function intended to increment the counter variable is executed, as the incorrect operation (`=+`) assigns a constant value rather than incrementing, thereby resetting the counter with each function call.
+
+            Detailed Vulnerability Description: The code snippet initially showed a critical vulnerability, identified as SWC-129, due to incorrect use of an assignment operator (`=+`). In Solidity, `=+` syntax misguides the code’s intent because:
+
+- `onlyOne =+ 1;` does not increment the value of `onlyOne` as intended. Instead, it simply assigns the positive value of 1 to `onlyOne`, overwriting its prior value. 
+- This erroneous operation sets the `onlyOne` variable to 1 every time the `addOne` function is executed instead of incrementing it by 1.
+- The condition `if(onlyOne > 1)` can never be true because `onlyOne` is always reset to 1. Therefore, the boolean flag `win`, which is supposed to change to `true` when `onlyOne` exceeds 1, will never be updated. This renders the intended logic to track increments and verify winning conditions ineffective.
+
+This vulnerability arises from a classic typographical error where an assignment operation (`=+`) masquerades as a valid operation but does not achieve the intended state change. The unary `+` operator is outdated in recent Solidity versions, which exacerbates the problem. 
+
+###
+            Solution Description: The resolution involved correcting the assignment operation from `=+` to the intended `+=` operator. The corrected code snippet uses `onlyOne += 1;`, which accurately increments the `onlyOne` variable each time `addOne` is called. This fix ensures:
+
+- The `+=` operator correctly modifies the state by incrementally adding 1 to the current value of `onlyOne`.
+- As the value of `onlyOne` exceeds 1, the condition `if(onlyOne > 1)` evaluates to true, and the `win` variable is set to `true`.
+- Thus, the smart contract's logic works as expected, enabling the tracking and verification of conditions based on cumulative state changes over time. 
+

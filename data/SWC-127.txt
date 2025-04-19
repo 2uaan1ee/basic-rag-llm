@@ -1,0 +1,95 @@
+vulnerable code:
+/*
+ * @source: https://gist.github.com/wadeAlexC/7a18de852693b3f890560ab6a211a2b8
+ * @author: Alexander Wade
+ */
+
+pragma solidity ^0.4.25;
+
+contract FunctionTypes {
+
+ constructor() public payable { require(msg.value != 0); }
+
+ function withdraw() private {
+ require(msg.value == 0, 'dont send funds!');
+ address(msg.sender).transfer(address(this).balance);
+ }
+
+ function frwd() internal
+ { withdraw(); }
+
+ struct Func { function () internal f; }
+
+ function breakIt() public payable {
+ require(msg.value != 0, 'send funds!');
+ Func memory func;
+ func.f = frwd;
+ assembly { mstore(func, add(mload(func), callvalue)) }
+ func.f();
+ }
+}
+
+
+Abstract purpose: Demonstrating different types of functions (private, internal) and function pointers in a Solidity smart contract.
+
+Detail Behaviors:
+1. Constructor function that requires non-zero value upon deployment.
+2. Private function "withdraw" that transfers contract balance to sender if sender balance is zero.
+3. Internal function "frwd" that calls the private "withdraw" function.
+4. Struct "Func" containing a function pointer.
+5. Public payable function "breakIt" that requires funds, creates a Func struct, updates it with the "frwd" function, and executes the updated function.
+
+fixed code:
+/*
+ * @source: https://gist.github.com/wadeAlexC/7a18de852693b3f890560ab6a211a2b8
+ * @author: Alexander Wade
+ */
+
+pragma solidity ^0.4.25;
+
+contract FunctionTypes {
+
+ constructor() public payable { require(msg.value != 0); }
+
+ function withdraw() private {
+ require(msg.value == 0, 'dont send funds!');
+ address(msg.sender).transfer(address(this).balance);
+ }
+
+ function frwd() internal { withdraw(); }
+
+ struct Func { function () internal f; }
+
+ function breakIt() public payable {
+ require(msg.value != 0, 'send funds!');
+ Func memory func;
+ func.f = frwd;
+ // Removed unsafe assembly code
+ func.f();
+ }
+}
+
+
+Abstract Vulnerability Description: Unauthorized manipulation of function pointers due to low-level memory operations can lead to the execution of unintended or malicious logic within a smart contract. This vulnerability allows attackers to redirect function calls to arbitrary code locations, thereby compromising contract integrity and security.
+
+Trigger Action: Execution of assembly code that modifies the memory location of a function pointer, specifically through operations that alter function type variables, such as inline memory storage manipulations.
+
+            Detailed Vulnerability Description: **
+
+The vulnerability identified in the original code is associated with Solidity's function types, which allow a variable to be assigned a reference to a function with a matching signature. The specific issue here arises when a user has the ability to arbitrarily modify the function type variable, allowing the execution of unintended code instructions.
+
+In the original code, there is a function called `breakIt` where the vulnerability is located. The function uses inline assembly, which is powerful but dangerous because it allows low-level access to memory. Specifically, the segment `assembly { mstore(func, add(mload(func), callvalue)) }` modifies the memory location where `func.f` is stored. This operation can be exploited by a malicious actor to adjust the function pointer to point to arbitrary instructions, potentially violating the logic and security of the contract. An attacker could redirect the function call to a location where unauthorized or unintended logic resides, compromising the integrity or draining funds from the contract.
+
+**
+            Solution Description: **
+
+The modification eliminates this vulnerability by removing the unsafe assembly block `assembly { mstore(func, add(mload(func), callvalue)) }`, thereby mitigating the risk of arbitrary function pointer manipulation. This measure ensures that the function type variable `func.f` is solely assigned to the intended `frwd` function without exposure to manipulation through low-level memory operations.
+
+To generalize this solution:
+
+1. **Restrict the Use of Assembly for Function Pointers**: Avoid using inline assembly operations that manipulate memory for function pointers unless critically necessary and fully understood. By removing these low-level operations, the function type's integrity and contract's intended control flow are preserved.
+
+2. **Adopt Safe Assignments**: Safely assign function type variables directly within the Solidity syntax, ensuring that their values are controlled and predictable.
+
+3. **Understand and Control Function Pointers**: Ensure that the logic surrounding function types is tightly controlled. Verify that any delegate or dynamic function calls are only utilized in strictly validated scenarios, minimizing the risk of dynamic reallocation by attackers.
+

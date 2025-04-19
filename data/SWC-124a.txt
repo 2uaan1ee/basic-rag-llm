@@ -1,0 +1,98 @@
+vulnerable code:
+pragma solidity ^0.4.25;
+
+contract Wallet {
+ uint[] private bonusCodes;
+ address private owner;
+
+ constructor() public {
+ bonusCodes = new uint[](0);
+ owner = msg.sender;
+ }
+
+ function () public payable {
+ }
+
+ function PushBonusCode(uint c) public {
+ bonusCodes.push(c);
+ }
+
+ function PopBonusCode() public {
+ require(0 <= bonusCodes.length);
+ bonusCodes.length--;
+ }
+
+ function UpdateBonusCodeAt(uint idx, uint c) public {
+ require(idx < bonusCodes.length);
+ bonusCodes[idx] = c;
+ }
+
+ function Destroy() public {
+ require(msg.sender == owner);
+ selfdestruct(msg.sender);
+ }
+}
+
+
+Abstract purpose: The code snippet defines a simple Smart Contract for managing bonus codes in a wallet.
+
+Detail Behaviors: 
+1. Constructor initializes the bonusCodes array and sets the owner address.
+2. Fallback function allows the contract to receive Ether.
+3. PushBonusCode function adds a bonus code to the array.
+4. PopBonusCode function removes the last bonus code from the array.
+5. UpdateBonusCodeAt function updates a bonus code at a specific index.
+6. Destroy function allows the owner to self-destruct the contract.
+
+fixed code:
+pragma solidity ^0.4.25;
+
+contract Wallet {
+ uint[] private bonusCodes;
+ address private owner;
+
+ constructor() public {
+ bonusCodes = new uint[](0);
+ owner = msg.sender;
+ }
+
+ function () public payable {
+ }
+
+ function PushBonusCode(uint c) public {
+ bonusCodes.push(c);
+ }
+
+ function PopBonusCode() public {
+ require(0 < bonusCodes.length);
+ bonusCodes.length--;
+ }
+
+ function UpdateBonusCodeAt(uint idx, uint c) public {
+ require(idx < bonusCodes.length); 
+ bonusCodes[idx] = c;
+ }
+
+ function Destroy() public {
+ require(msg.sender == owner);
+ selfdestruct(msg.sender);
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability relates to insufficient protection of critical contract storage when modifying data structures. Specifically, an ineffective validation mechanism fails to prevent unauthorized manipulations of an array's length, potentially allowing unauthorized memory alterations and compromising data integrity. The issue highlights the importance of stringent validation and access control in operations that interact with critical contract data to prevent unauthorized access or state corruption.
+
+Trigger Action: Invoking the function intended to modify a data storage element without adequate validation of the data's pre-modified state or the privilege of the caller.
+
+            Detailed Vulnerability Description: The vulnerability present in the initial contract code is identified as SWC-124, which relates to write protection on critical contract data storage. Specifically, the code contains a flaw in the `PopBonusCode` function, where the requirement `require(0 <= bonusCodes.length);` is ineffective because it always evaluates to true. This check is supposed to ensure that the length of the `bonusCodes` array is greater than zero before attempting to decrement it. However, lacking a stringent check allows unauthorized modifications to the length of the `bonusCodes`, potentially leading to unauthorized memory manipulations and state corruptions.
+
+This issue stems from inadequate protection against attempts to modify critical storage elements inappropriately. Any user interacting with the `PopBonusCode` function could erroneously reduce the length of the array, leading to potential breaches in data integrity or causing logical errors due to underflow vulnerabilities.
+
+Furthermore, compromising such storage variables can have cascading effects, granting unauthorized access or control, particularly if the contract does not efficiently validate other areas accessing the stored data, leaving the contract open to manipulation and potentially fatal vulnerabilities like unauthorized access to privileged functions.
+
+###
+            Solution Description: The solution involves modifying the requirement in the `PopBonusCode` function to effectively prevent the decrement operation on the array length when the length is zero. The altered check, `require(0 < bonusCodes.length);`, properly evaluates the array length, ensuring it is strictly greater than zero before decrement allows transitioning to the array length.
+
+This effectively enforces a boundary condition check, ensuring that the storage location isn't manipulated when the conditions are not met. By improving the require statement, it prevents unauthorized decreases in the array size, thereby securing the storage integrity and data consistency. 
+
+Additionally, it is crucial to consistently apply such checks wherever storage modifications occur, accompanied by proper verification of caller privileges. By implementing additional constraints and secure coding practices, such as input validation and limiting direct state changes, the risk of similar vulnerabilities is mitigated, reinforcing contract resilience against malicious actors.

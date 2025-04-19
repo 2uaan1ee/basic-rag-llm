@@ -1,0 +1,103 @@
+vulnerable code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ */
+pragma solidity ^0.4.22;
+
+contract MappingPerformance2sets{
+
+ mapping(bytes32=>uint) m0;
+ mapping(bytes32=>uint) m1;
+ mapping(bytes32=>uint) m2;
+ mapping(bytes32=>uint) m3;
+ mapping(bytes32=>uint) m4;
+ mapping(bytes32=>uint) m5;
+ uint b;
+
+ constructor(){
+ b = 10;
+ }
+
+ function set(bytes32 a, uint cond){
+ if(cond == 0){
+ m0[a] = 5;
+ }else if(cond == 1){
+ m1[a] = 5;
+ }else if(cond == 2){
+ m2[a] = 5;
+ }else if(cond == 3){
+ m3[a] = 5;
+ }else if(cond == 4){
+ m4[a] = 5;
+ }
+ }
+ function check(bytes32 a0, uint cond0,
+ bytes32 a1, uint cond1, bytes32 a){
+ set(a0, cond0);
+ set(a1, cond1);
+ assert(m5[a] == 0);
+ }
+}
+
+
+Abstract purpose: Demonstrating the use of multiple mappings and setting values based on conditions.
+
+Detail Behaviors: 
+1. Sets a value in different mappings based on a condition input.
+2. Checks the values stored in two different mappings and verifies that a specific value in another mapping is equal to zero.
+
+fixed code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ */
+pragma solidity ^0.4.22;
+
+contract MappingPerformance2sets{
+
+ mapping(bytes32=>uint) m0;
+ mapping(bytes32=>uint) m1;
+ mapping(bytes32=>uint) m2;
+ mapping(bytes32=>uint) m3;
+ mapping(bytes32=>uint) m4;
+ mapping(bytes32=>uint) m5;
+ uint b;
+
+ constructor() public {
+ b = 10;
+ }
+
+ function set(bytes32 a, uint cond) public {
+ if(cond == 0){
+ m0[a] = 5;
+ }else if(cond == 1){
+ m1[a] = 5;
+ }else if(cond == 2){
+ m2[a] = 5;
+ }else if(cond == 3){
+ m3[a] = 5;
+ }else if(cond == 4){
+ m4[a] = 5;
+ }
+ }
+
+ function check(bytes32 a0, uint cond0,
+ bytes32 a1, uint cond1, bytes32 a) public {
+ set(a0, cond0);
+ set(a1, cond1);
+ require(m5[a] == 0, "m5[a] is not zero!"); // Thay assert() bằng require()
+ }
+}
+
+Abstract Vulnerability Description: The misuse of internal verification functions to handle external input validations can lead to inefficient error handling, increased transaction costs, and hindered debugging due to lack of informative error messages. Contracts relying on blanket assertions to confirm state conditions risk unnecessary resource depletion and obscure failure diagnostics during interactions influenced by external users.
+
+Trigger Action: Utilizing an internal error-checking function to validate external input-driven conditions, specifically where system invariants are not guaranteed, thus misdirecting error handling logic and incurring unintended gas consumption upon failure.
+
+            Detailed Vulnerability Description: **
+The original code employs `assert()` to check if `m5[a]` is zero in the `check()` function. However, `assert()` is meant for internal errors and should not be triggered by external inputs. It lacks error messaging, making debugging and error identification difficult. This vulnerability is problematic for contracts intended to function correctly through external inputs and can inadvertently cause transaction failures, leading to unexpected gas costs for the user.
+
+**
+            Solution Description: **
+The solution involves replacing the `assert()` with `require()`. The `require()` function is generally used for validating inputs and ensuring expected conditions. When the condition in `require()` evaluates to false, it halts the execution, reverts the state changes, and refunds the remaining gas. Importantly, it allows for a custom error message, which improves clarity and debugging. In the modified code, `require(m5[a] == 0, "m5[a] is not zero!")` is used, effectively checking the condition with a clear error message when the expected condition is violated.
+

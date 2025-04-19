@@ -1,0 +1,163 @@
+vulnerable code:
+/*
+ * @source: https://gist.github.com/manojpramesh/336882804402bee8d6b99bea453caadd#file-odd-even-sol
+ * @author: https://github.com/manojpramesh
+ * Modified by Kaden Zipfel
+ */
+
+pragma solidity ^0.5.0;
+
+contract OddEven {
+ struct Player {
+ address addr;
+ uint number;
+ }
+
+ Player[2] private players;
+ uint count = 0;
+
+ function play(uint number) public payable {
+ require(msg.value == 1 ether, 'msg.value must be 1 eth');
+ players[count] = Player(msg.sender, number);
+ count++;
+ if (count == 2) selectWinner();
+ }
+
+ function selectWinner() private {
+ uint n = players[0].number + players[1].number;
+ (bool success, ) = players[n%2].addr.call.value(address(this).balance)("");
+ require(success, 'transfer failed');
+ delete players;
+ count = 0;
+ }
+}
+
+
+Abstract purpose: The purpose of the above code snippet is to implement a simple betting game where players guess whether the sum of their chosen numbers is odd or even, with the winner receiving the pooled bet amount.  
+
+Detail Behaviors: 
+1. Players can play by calling the 'play' function and sending 1 ether along with their chosen number.
+2. Once two players have made their guesses, the 'selectWinner' function is triggered to determine the winner based on whether the sum of the chosen numbers is odd or even.
+3. The winner receives the total bet amount and the game state is reset for the next round.
+
+fixed code:
+/*
+ * @source: https://github.com/yahgwai/rps
+ * @author: Chris Buckland
+ * Modified by Kaden Zipfel
+ * Modified by Kacper Żuk
+ */
+
+pragma solidity ^0.5.0;
+
+contract OddEven {
+ enum Stage {
+ FirstCommit,
+ SecondCommit,
+ FirstReveal,
+ SecondReveal,
+ Distribution
+ }
+
+ struct Player {
+ address addr;
+ bytes32 commitment;
+ bool revealed;
+ uint number;
+ }
+
+ Player[2] private players;
+ Stage public stage = Stage.FirstCommit;
+
+ function play(bytes32 commitment) public payable {
+ 
+ uint playerIndex;
+ if(stage == Stage.FirstCommit) playerIndex = 0;
+ else if(stage == Stage.SecondCommit) playerIndex = 1;
+ else revert("only two players allowed");
+
+ 
+ 
+ require(msg.value == 2 ether, 'msg.value must be 2 eth');
+
+ 
+ players[playerIndex] = Player(msg.sender, commitment, false, 0);
+
+ 
+ if(stage == Stage.FirstCommit) stage = Stage.SecondCommit;
+ else stage = Stage.FirstReveal;
+ }
+
+ function reveal(uint number, bytes32 blindingFactor) public {
+ 
+ require(stage == Stage.FirstReveal || stage == Stage.SecondReveal, "wrong stage");
+
+ 
+ uint playerIndex;
+ if(players[0].addr == msg.sender) playerIndex = 0;
+ else if(players[1].addr == msg.sender) playerIndex = 1;
+ else revert("unknown player");
+
+ 
+ require(!players[playerIndex].revealed, "already revealed");
+
+ 
+ require(keccak256(abi.encodePacked(msg.sender, number, blindingFactor)) == players[playerIndex].commitment, "invalid hash");
+
+ 
+ players[playerIndex].number = number;
+
+ 
+ players[playerIndex].revealed = true;
+
+ 
+ if(stage == Stage.FirstReveal) stage = Stage.SecondReveal;
+ else stage = Stage.Distribution;
+ }
+
+ function distribute() public {
+ 
+ require(stage == Stage.Distribution, "wrong stage");
+
+ 
+ uint n = players[0].number + players[1].number;
+
+ 
+ players[n%2].addr.call.value(3 ether)("");
+
+ 
+ players[(n+1)%2].addr.call.value(1 ether)("");
+
+ 
+ delete players;
+ stage = Stage.FirstCommit;
+ }
+}
+
+
+Abstract Vulnerability Description:  
+The vulnerability pertains to the misconception of variable privacy in smart contracts, where such variables are mistakenly assumed to be secure from external access. This false assumption allows sensitive game-related data, like player selections, to be exposed due to the blockchain's transparent nature. Furthermore, the contract is susceptible to state manipulation because of the lack of structured interaction phases, which could lead to improper revelation sequences. Additionally, the use of unsafe low-level calls for ether transfers poses risks of execution failures and potential reentrancy attacks due to insufficient failure handling and gas management.
+
+Trigger Action:  
+The trigger action for this vulnerability is the direct storage of sensitive data on the blockchain and the execution of low-level ether transfers using `.call.value()`, both of which occur without appropriate protective measures such as phased interactions or robust error handling.
+
+            Detailed Vulnerability Description: **
+
+The original vulnerability identified as SWC-136 is related to a common misconception about the privacy of variables marked as `private` in smart contracts. Specifically, the assumption that private variables cannot be read externally is false since any data stored on the blockchain, including `private` variables, can be accessed by determined attackers through transaction analysis or state inspection. In the initial contract, this transparency poses a significant risk as the players' numbers were stored directly, allowing an adversary to potentially determine what number each player chose. Furthermore, the contract fails to enforce a robust multi-phase interaction pattern, increasing the potential for exploitation since both player commitments and number revelations occur within the same function flow without a structured stage-based approach.
+
+Additionally, the usage of low-level calls with `.call.value()` is problematic, as it does not handle execution failures robustly and lacks any gas stipend management or reentrancy protections, possibly leading to unexpected behavior in scenarios where ether transfer fails.
+
+**
+            Solution Description: **
+
+The solution involves multiple critical changes to address the vulnerability:
+
+1. **Commit-Reveal Scheme:**
+   The modified contract introduces a commit-reveal mechanism that requires players to submit a cryptographic commitment of their numbers first. Players later reveal their number along with a blinding factor. This ensures that players' numbers are not directly stored or revealed until the actual reveal phase, greatly enhancing the integrity and privacy of the game operation.
+
+2. **Stage Management with State Variables:**
+   The use of an `enum` to manage the stages of the game (FirstCommit, SecondCommit, FirstReveal, SecondReveal, Distribution) controls the flow of the game strictly, preventing players from advancing to the next stage without passing the previous ones. This prevents premature reveals and manages the logical flow of operations sequentially.
+
+3. **Transfer Management:**
+   The revised contract specifically divides the distribution phase, using `.call.value()` with fixed values and without further logic combined in the same inline operations, reducing the risks associated with reentrancy. This method delicately controls the ether distribution post-reveal, ensuring no unexpected overrides or reentrant calls disrupt the intended ether transfers.
+

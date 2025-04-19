@@ -1,0 +1,76 @@
+vulnerable code:
+
+
+pragma solidity ^0.4.11;
+
+contract IntegerOverflowMappingSym1 {
+ mapping(uint256 => uint256) map;
+
+ function init(uint256 k, uint256 v) public {
+ map[k] -= v;
+ }
+}
+
+
+Abstract purpose: The code snippet aims to demonstrate integer underflow vulnerability in a Solidity smart contract using a mapping data structure.
+
+Detail Behaviors: 
+1. Defines a Solidity contract named IntegerOverflowMappingSym1.
+2. Includes a mapping data structure with uint256 keys and values.
+3. Contains a function init that subtracts a value v from the mapping corresponding to key k.
+
+fixed code:
+
+
+
+pragma solidity ^0.4.16;
+
+contract IntegerOverflowMappingSym1 {
+ mapping(uint256 => uint256) map;
+
+ function init(uint256 k, uint256 v) public {
+ map[k] = sub(map[k], v);
+ }
+
+ 
+ function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b <= a);
+ return a - b;
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability involves unprotected arithmetic operations on numeric data types, specifically involving subtraction, which may produce unexpected results when limits are exceeded, leading to potentially exploitable wrap-around effects in the system.
+
+Trigger Action: Attempting an arithmetic subtraction operation where the value being subtracted is greater than the current value, causing an underflow and wrapping to a maximum possible value without prior validation.
+
+            Detailed Vulnerability Description: In Solidity, an _SWC-101: Integer Overflow and Underflow_ vulnerability occurs when arithmetic operations exceed the storage limits of the data type used. Specifically, for unsigned integers (\`uint\`), decrementing below zero results in a wrap-around back to the maximum possible value of the data type used. In the initial implementation of the contract, the function \`init\` directly decrements a mapping's value without any checks against underflow:
+
+```solidity
+map[k] -= v;
+```
+
+This operation can potentially cause an underflow if \`v\` is greater than the current value of \`map[k]\`. This results in unintentionally wrapping to a very large number, causing critical bugs and potential exploitations if the contract relies on these values for logic execution.
+
+###
+            Solution Description: The modified version addresses the underflow concern by introducing a safe subtraction function, \`sub\`, which includes a requirement check:
+
+```solidity
+function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+    require(b <= a);
+    return a - b;
+}
+```
+
+In this revised method, before subtracting, the function ensures that \`b\` is less than or equal to \`a\`. This guarantee prevents the underflow condition and ensures mathematical correctness by reverting the transaction if the condition isn't satisfied—therefore avoiding unintended decrement behavior.
+
+The modification also transforms the original arithmetic statement into a call to this internal \`sub\` function:
+
+```solidity
+map[k] = sub(map[k], v);
+```
+
+By implementing a safety check, the contract now prevents the exploitation of the Integer Underflow vulnerability, enhancing both the security and integrity of the smart contract operation.
+
+---
+By utilizing a defined internal function to safeguard arithmetic operations, this pattern ensures that the contract not only adheres to safe coding practices but also maintains predictability and reliability in operation outcomes, which are fundamental to smart contract security standards.

@@ -1,0 +1,87 @@
+vulnerable code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ */
+pragma solidity ^0.4.22;
+
+contract RuntimeCreateUserInput{
+
+ function check(uint x){
+ B b = new B(x);
+ assert(b.foo() == 10);
+ }
+
+}
+
+contract B{
+
+ uint x_;
+ constructor(uint x){
+ x_ = x;
+ }
+
+ function foo() returns(uint){
+ return x_;
+ }
+
+}
+
+
+Abstract purpose: Instantiate a new contract of type B with a parameter x, and assert that the return value of the foo function on the new instance is 10.
+
+Detail Behaviors: 
+1. Instantiate a new contract of type B with parameter x.
+2. Assert that the return value of the foo function on the new instance is 10. 
+
+fixed code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ */
+pragma solidity ^0.4.22;
+
+contract RuntimeCreateUserInput {
+    function check(uint x) public {
+        B b = new B(x);
+        require(b.foo() == 10, "Value must be 10!");
+    }
+}
+
+contract B{
+
+ uint x_;
+ constructor(uint x) public {
+ x_ = x;
+ }
+
+ function foo() public returns(uint){
+ return x_;
+ }
+
+}
+
+
+Abstract Vulnerability Description: The vulnerability arises from the misuse of low-level assertion functions to enforce conditions influenced by external inputs. Such misuse can result in unintended gas consumption and transaction failures when conditions fail, rather than providing graceful error handling typical for user input validation.
+
+Trigger Action: Deploying logic in the contract where an `assert()` function is used for validating inputs or conditions that are subject to control or manipulation by external users or interfaces, potentially leading to unexpected gas consumption upon failure.
+
+            Detailed Vulnerability Description: The original code utilizes the `assert()` function to ensure that a condition holds true after the creation of an instance of contract `B` and invoking its `foo()` method. In Solidity, `assert()` is primarily used to assert internal invariants within the code, particularly those that should never fail unless the contract is severely broken. It is a low-level assertion, implying that a failure would indicate critical issues within the code, leading to a revert consuming all remaining gas.
+
+In this scenario, using `assert()` is inappropriate because the code sacrifices correctness for attempted certainty, handling user-supplied input with the potential to disrupt program flow erroneously. An assertion failure here would unnecessarily consume all remaining transaction gas, rather than returning gracefully as expected for typical input validation failures.
+
+###
+            Solution Description: The modification replaces the `assert()` statement with a `require()` function, effectively addressing the misuse of `assert`. The `require()` function is ideally used for input and condition validation, providing a sensible and controlled failure mechanism when expectations are not met. It performs checks more typical to user input or preconditions and reverts changes if a condition evaluates to `false`, while also accepting a custom error message to describe the failure cause, enhancing debugging and user communication. Importantly, `require()` refunds remaining gas, aligning with the principle of gas efficiency and user-friendliness.
+
+Therefore, using `require()` ensures any failure, when `b.foo() != 10`, behaves predictably, reverting changes and conserving gas, while effectively communicating the reason with a meaningful message: "Value must be 10!"
+
+### Generalizable Specific Behavior Leading to the Vulnerability:
+- **Function Misuse**: Using `assert()` for input validation or external input handling.
+- **Expectation of Invalid Conditions**: Allowing user-controlled conditions to potentially reach `assert()` statements.
+- **Gas Consumption Issues**: Uncontrolled or unnecessary gas consumption upon assertion failures for conditions that are naturally prone to user influence.
+
+### Specific Solution to Fix It:
+- **Use Appropriate Function**: Replace `assert()` with `require()` for precondition checks, particularly those influenced by external or user inputs.
+- **Error Messaging**: Incorporate clear and descriptive error messages within `require()` to facilitate easier debugging and clearer user communication.
+- **Gas Preservation**: Rely on `require()` to ensure efficient gas usage upon condition failures, maintaining transactional integrity and reducing unnecessary gas loss.
+

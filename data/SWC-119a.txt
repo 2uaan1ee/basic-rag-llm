@@ -1,0 +1,57 @@
+vulnerable code:
+pragma solidity 0.4.24;
+
+contract Tokensale {
+ uint hardcap = 10000 ether;
+
+ function Tokensale() {}
+
+ function fetchCap() public constant returns(uint) {
+ return hardcap;
+ }
+}
+
+contract Presale is Tokensale {
+ uint hardcap = 1000 ether;
+
+ function Presale() Tokensale() {}
+}
+
+
+Abstract purpose: The purpose of the code snippet is to demonstrate inheritance of variables and functions between two Solidity contracts.
+
+Detail Behaviors:
+1. Define a contract Tokensale with a hardcap variable and fetchCap function.
+2. Inherit from Tokensale to create the contract Presale with its own hardcap variable.
+3. Implement a constructor function for Presale that invokes the constructor of Tokensale.
+
+fixed code:
+pragma solidity 0.4.25;
+
+
+
+contract Tokensale {
+ uint public hardcap = 10000 ether;
+
+ function Tokensale() {}
+
+ function fetchCap() public constant returns(uint) {
+ return hardcap;
+ }
+}
+
+contract Presale is Tokensale {
+ 
+ 
+ function Presale() Tokensale() {
+ hardcap = 1000 ether; 
+ }
+}
+
+
+Abstract Vulnerability Description: State variable shadowing in contract inheritance can lead to ambiguity and unintended behavior regarding the variable’s value when accessed or modified. If multiple contracts define the same variable name in an inheritance hierarchy, each contract maintains distinct states for this variable. This can result in inconsistent logic and potential security vulnerabilities when contract functions are executed, as the wrong instance of the variable may be used contrary to developer expectations.
+
+Trigger Action: Defining the same state variable name in multiple contracts that are part of an inheritance chain, resulting in separate instances of the variable.
+
+            Detailed Vulnerability Description: The vulnerability in question pertains to SWC-119, which revolves around the shadowing of state variables in Solidity contracts, especially when inheritance structures are utilized. In the provided code snippet, the `Tokensale` and `Presale` contracts both define a state variable named `hardcap`. When the `Presale` contract inherits from the `Tokensale` contract, Solidity allows both definitions of `hardcap` to coexist; this results in two distinct `hardcap` variables, one accessible from `Tokensale` and one from `Presale`. This state variable shadowing can introduce ambiguity and unexpected behavior in the contracts, primarily because calls to `hardcap` from `Presale` might retrieve a value different from what a developer intended if they are unaware of the shadowing issue. Also, inconsistencies might arise between the logical specification of desired behavior and the actual implementation, potentially leading to security concerns or malfunctioning financial logic.
+            Solution Description: To rectify the vulnerability and eliminate the shadowing issue, the updated code removes the definition of `hardcap` from the `Presale` contract and modifies its initialization process within the constructor of `Presale`. The state variable `hardcap` in `Tokensale` has been declared as `public`, making it accessible and modifiable transparently across inherited contracts. Instead of re-declaring it in `Presale`, the constructor of `Presale` directly assigns a new value (1000 ether) to `hardcap`, thereby reusing the inherited variable rather than creating a secondary instance. This ensures that there is no ambiguity regarding which `hardcap` variable is being referenced or modified, and any access to `hardcap` in either contract reflects the intended logic and state, maintaining code clarity and correctness in the inheritance chain. This change effectively addresses the shadowing problem by ensuring that variable definitions are unique and state changes are intentional and traceable.

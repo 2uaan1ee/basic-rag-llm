@@ -1,0 +1,114 @@
+vulnerable code:
+pragma solidity 0.4.24;
+
+contract TestStorage {
+
+ uint storeduint1 = 15;
+ uint constant constuint = 16;
+ uint32 investmentsDeadlineTimeStamp = uint32(now);
+
+ bytes16 string1 = "test1";
+ bytes32 private string2 = "test1236";
+ string public string3 = "lets string something";
+
+ mapping (address => uint) public uints1;
+ mapping (address => DeviceData) structs1;
+
+ uint[] uintarray;
+ DeviceData[] deviceDataArray;
+
+ struct DeviceData {
+ string deviceBrand;
+ string deviceYear;
+ string batteryWearLevel;
+ }
+
+ function testStorage() public {
+ address address1 = 0xbccc714d56bc0da0fd33d96d2a87b680dd6d0df6;
+ address address2 = 0xaee905fdd3ed851e48d22059575b9f4245a82b04;
+
+ uints1[address1] = 88;
+ uints1[address2] = 99;
+
+ DeviceData memory dev1 = DeviceData("deviceBrand", "deviceYear", "wearLevel");
+
+ structs1[address1] = dev1;
+
+ uintarray.push(8000);
+ uintarray.push(9000);
+
+ deviceDataArray.push(dev1);
+ }
+}
+
+
+Abstract purpose: Demonstrating the implementation of a smart contract with data storage functionalities.
+
+Detail Behaviors: 
+1. Setting initial values for uint variables and strings.
+2. Defining mappings to store uint values and structs based on addresses.
+3. Creating arrays to store uint values and struct instances.
+4. Initializing values for mappings, arrays, and struct instances inside the constructor function.
+
+fixed code:
+pragma solidity 0.4.24;
+
+contract TestStorage {
+
+    uint public storeduint1 = 15; // Explicitly labeled as public
+    uint constant constuint = 16; // Constants do not need visibility
+    uint32 public investmentsDeadlineTimeStamp = uint32(now); // Explicitly labeled as public
+
+    bytes16 public string1 = "test1"; // Explicitly labeled as public
+    bytes32 private string2 = "test1236"; // Already private
+    string public string3 = "lets string something"; // Already public
+
+    mapping (address => uint) public uints1; // Already public
+    mapping (address => DeviceData) private structs1; // Explicitly labeled as private
+
+    uint[] private uintarray; // Explicitly labeled as private
+    DeviceData[] private deviceDataArray; // Explicitly labeled as private
+
+    struct DeviceData {
+        string deviceBrand;
+        string deviceYear;
+        string batteryWearLevel;
+    }
+
+    function testStorage() public {
+        address address1 = 0xbccc714d56bc0da0fd33d96d2a87b680dd6d0df6;
+        address address2 = 0xaee905fdd3ed851e48d22059575b9f4245a82b04;
+
+        uints1[address1] = 88;
+        uints1[address2] = 99;
+
+        DeviceData memory dev1 = DeviceData("deviceBrand", "deviceYear", "wearLevel");
+
+        structs1[address1] = dev1;
+
+        uintarray.push(8000);
+        uintarray.push(9000);
+
+        deviceDataArray.push(dev1);
+    }
+}
+
+
+Abstract Vulnerability Description: Failure to explicitly declare visibility for state variables in a Smart Contract can lead to unauthorized access or manipulation by external parties. This vulnerability arises when developers rely on implicit default visibility settings, potentially resulting in unintended exposure of sensitive information, as access assumptions are made without explicit declarations.
+
+Trigger Action: Deploying a smart contract with state variables whose visibility has not been explicitly declared, thereby defaulting to implicit settings and potentially allowing unintended access or manipulation by unauthorized entities.
+
+            Detailed Vulnerability Description: The SWC-108 vulnerability revolves around the absence of explicitly defined visibility for state variables within the Smart Contract. In the provided code snippet prior to modification, the visibility of several variables was not defined, thereby defaulting to `internal`. The original contract relied on implicit visibility settings, which can yield incorrect assumptions regarding who or what can access these variables. This issue poses a risk of unauthorized manipulation or access to sensitive contract states and data. Notably, the variables affected include `storeduint1`, `investmentsDeadlineTimeStamp`, `string1`, and the mappings and arrays within the contract. Implicit visibility can mislead developers into believing that data is obscured from external interfaces when it is not, potentially resulting in unintended exposure of sensitive information.
+
+###
+            Solution Description: To mitigate the risk presented by SWC-108, it is imperative to explicitly declare the visibility of all state variables in a Smart Contract. The solution provided in the modified code addresses this by:
+
+1. **Declaring Visibility**: Explicit visibility keywords such as `public`, `private`, or `internal` are added to variables, ensuring clear understanding of the data access level.
+   - `storeduint1` and `investmentsDeadlineTimeStamp` were assigned `public` visibility.
+   - `string1` was marked `public` to clarify its intended exposure.
+   - Structures like `structs1` were explicitly labeled `private` to enforce restricted access.
+   - Arrays like `uintarray` and `deviceDataArray` were given `private` visibility, confining their use within the contract scope.
+
+2. **Leveraging Solidity Features**: Using Solidity's built-in functionality to define getters for public variables ensures that data retrieval is controlled and does not involve unintended data exposure.
+
+

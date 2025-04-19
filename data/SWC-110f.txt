@@ -1,0 +1,64 @@
+vulnerable code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ */
+
+pragma solidity ^0.4.25;
+
+contract ConstructorCreate{
+ B b = new B();
+
+ function check(){
+ assert(b.foo() == 10);
+ }
+
+}
+
+contract B{
+
+ function foo() returns(uint){
+ return 11;
+ }
+}
+
+
+Abstract purpose: The code snippet creates a smart contract that instantiates another contract and checks a specific function call result.
+
+Details Behaviors:
+1. Instantiate contract B within contract ConstructorCreate.
+2. Define a function check in ConstructorCreate to assert that the result of calling foo() in contract B is equal to 10.
+
+fixed code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ */
+
+pragma solidity ^0.4.25;
+
+contract ConstructorCreate {
+    B b = new B();  
+
+    function check() public {
+        require(b.foo() == 10);  
+    }
+}
+
+contract B {
+    function foo() public returns(uint) {
+        return 11;  
+    }
+}
+
+
+Abstract Vulnerability Description: The identified vulnerability pertains to the misuse of an invariant-checking function for conditional validation in a smart contract. The function typically used to enforce conditions that should never fail is improperly applied to verify assumptions that may not always hold true. This misapplication can cause significant resource consumption and has the potential to induce unintended side effects if the condition is not met, resulting in the complete consumption of resources allocated for the transaction.
+
+Trigger Action: Invoking a function that returns a value which does not match the expected result, thereby breaching the condition guarded by an inappropriate invariant-checking mechanism.
+
+            Detailed Vulnerability Description: **
+The vulnerability identified as SWC-110 in the Solidity code snippet relates to the improper use of the `assert()` function. In Solidity, `assert()` is designed to serve as a mechanism for verifying invariants—conditions that should always be true for the contract to operate correctly. It should only be used to check for conditions that should never fail. If an `assert()` statement can be triggered, it typically indicates an unexpected behavior or logic error in the code, often resulting in a state change that cannot be reverted (as `assert()` causes the transaction to consume all provided gas upon failure). The problematic behavior in this snippet is that `b.foo()` is expected to return 10, which should meet the assertion. However, `b.foo()` returns 11, leading to an inevitable failure of the `assert()` and potential monetary loss due to gas consumption.
+
+**
+            Solution Description: **
+The modification involves replacing `assert(b.foo() == 10)` with `require(b.foo() == 10)`. Unlike `assert()`, `require()` serves as a precondition check and provides a more graceful failure mechanism. When a `require()` condition fails, the transaction is reverted, and remaining gas is refunded. This change is particularly suitable for validating inputs or assumptions that must hold true before proceeding with state changes or function execution. By using `require()`, the contract avoids the high gas penalty associated with a failed `assert()` and provides a more informative failure handling mechanism that aligns with expected control logic. Thus, switching from `assert()` to `require()` for input validation or external function response validation is a prudent practice to safeguard against unintended state changes and gas loss.

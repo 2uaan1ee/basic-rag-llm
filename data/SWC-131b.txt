@@ -1,0 +1,105 @@
+vulnerable code:
+pragma solidity ^0.5.0;
+
+contract UnusedVariables {
+ int a = 1;
+
+ 
+ function unusedArg(int x, int y) public view returns (int z) {
+ z = x + a; 
+ }
+
+ 
+ function unusedReturn(int x, int y) public pure returns (int m, int n, int o) {
+ m = y - x;
+ o = m/2;
+ }
+
+ 
+ function neverAccessed(int test) public pure returns (int) {
+ int z = 10;
+
+ if (test > z) {
+ 
+ int x = test - z;
+
+ return test - z;
+ }
+
+ return z;
+ }
+
+ function tupleAssignment(int p) public returns (int q, int r){
+ (q, , r) = unusedReturn(p,2);
+
+ }
+
+
+}
+
+
+Abstract purpose: Analyzing the code snippet of a Solidity smart contract to identify its functionalities.
+
+Detail Behaviors: 
+1. The function `unusedArg` adds the input `x` with a predefined value `a` and returns the result.
+2. The function `unusedReturn` subtracts the input `x` from `y` to get `m`, then divides `m` by 2 to get `o`.
+3. The function `neverAccessed` compares input `test` with a constant `z` and returns different values based on the comparison.
+4. The function `tupleAssignment` assigns the output of the `unusedReturn` function to variables `q` and `r`, discarding the second value.
+
+fixed code:
+pragma solidity ^0.5.0;
+
+contract UnusedVariables {
+ int a = 1;
+
+ function unusedArg(int x) public view returns (int z) {
+ z = x + a; 
+ }
+
+ 
+ function unusedReturn(int x, int y) public pure returns (int m, int n,int o) {
+ m = y - x;
+ o = m/2;
+ }
+
+ 
+ function neverAccessed(int test) public pure returns (int) {
+ int z = 10;
+
+ if (test > z) {
+ return test - z;
+ }
+
+ return z;
+ }
+
+ function tupleAssignment(int p) public returns (int q, int r){
+ (q, , r) = unusedReturn(p,2);
+
+ }
+
+}
+
+
+Abstract Vulnerability Description: The vulnerability involves the presence of unused variables within a smart contract, which, although not directly affecting security, can lead to inefficient code and increased gas costs upon deployment. This practice can also result in unclear code logic, potentially causing confusion for future contract maintainers. The presence of these extraneous variables signals potential oversight or incomplete implementation.
+
+Trigger Action: The trigger action for this vulnerability is the declaration of variables that are not utilized in any computational task or logic within the contract functions, leading to inefficient resource usage.
+
+            Detailed Vulnerability Description: **
+
+The provided code snippet suffers from a best-practice vulnerability identified by the SWC Registry identifier SWC-131. This vulnerability pertains to unused variables being present within a Solidity contract, which, while not directly impacting security, can lead to inefficient code, increased gas consumption during deployment, and potentially unclear logic that might confuse future maintainers.
+
+In the original code, several variables were declared but never utilized in any meaningful computation. This includes, but is not limited to:
+- The `y` parameter in the `unusedArg` function.
+- The `int x` variable within the `neverAccessed` function which is declared but never used for any computation.
+- The tuple variable `n` within the `tupleAssignment` function that is declared from the result of `unusedReturn`, but it was never used.
+
+These unused variables do not affect the contract’s execution directly but are indicators of potential oversight or incomplete logic implementation.
+
+**
+            Solution Description: **
+
+The resolution provided involves removing or modifying the parts of the code where these unused variables are flagged. The modified code effectively eliminates unnecessary variables or parameters. The steps taken include:
+- Removing `y` from the parameters of `unusedArg`, which is otherwise unused within the function logic.
+- Eliminating the declaration and usage of variable `x` within the `neverAccessed` function, as it does not contribute to the computational output.
+- Maintaining the logical integrity of tuple unpacking in the `tupleAssignment` function by omitting the unused variable `n`.

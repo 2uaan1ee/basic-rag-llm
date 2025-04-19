@@ -1,0 +1,58 @@
+vulnerable code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ * Assert violation with 2 message calls:
+ * - set(66)
+ * - check(0x4100000000000000000000000000000000000000000000000000000000000000)
+ */
+pragma solidity ^0.4.22;
+
+contract ShaOfShaCollission{
+
+ mapping(bytes32=>uint) m;
+
+ function set(uint x){
+ m[keccak256(abi.encodePacked("A", x))] = 1;
+ }
+ function check(uint x){
+ assert(m[keccak256(abi.encodePacked(x, "B"))] == 0);
+ }
+
+}
+
+
+Abstract purpose: Illustrating a potential vulnerability related to hash collisions in a smart contract.
+
+Detail Behaviors:
+1. The set function stores a value in a mapping using keccak256 hash of "A" concatenated with the input parameter.
+2. The check function asserts that a specific value in the mapping is equal to 0 based on the keccak256 hash of the input parameter concatenated with "B".
+
+fixed code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ * Fixed version replacing assert() with require().
+ */
+pragma solidity ^0.4.22;
+
+contract ShaOfShaCollission {
+
+    mapping(bytes32 => uint) m;
+
+    function set(uint x) public {
+        m[keccak256(abi.encodePacked("A", x))] = 1;
+    }
+
+    function check(uint x) public {
+        require(m[keccak256(abi.encodePacked(x, "B"))] == 0, "Condition failed");
+    }
+}
+
+Abstract Vulnerability Description: The misuse of Solidity's assertion mechanism, where `assert()` is used to enforce conditions that may legitimately fail under certain circumstances. This results in potentially unreachable assertions, leading to a critical contract failure if those conditions are not met. The correct approach is to use the `require()` function for conditions that might be expected to fail, allowing for better error handling and a more recoverable contract state.
+
+Trigger Action: The vulnerability is triggered by a situation where the input data can be manipulated to cause a hash collision, resulting in different inputs producing an identical hash. This leads to the `assert()` statement failing, thereby reverting the entire transaction due to a false invariant, indicating a severe fault in the code's logic.
+
+            Detailed Vulnerability Description: The code snippet originally contains a vulnerability identified as SWC-110, which refers to conditions that might lead to potentially unreachable assertions in the Solidity language. In the context of the provided code, this vulnerability arises due to the misuse of the `assert()` function. The `assert()` function is designed for situations where the invariants in the code are strictly expected to hold and any failure indicates a critical bug. However, the logic of the provided code can potentially lead to a violation of this invariant if a caller is able to manipulate the bytes input such that the hash collision occurs between the encoded values used in the `set()` and `check()` functions. If a collision occurs where two different inputs produce the same hash, the `assert()` statement can fail, causing the entire transaction to revert, indicating a severe fault in contract execution.
+            Solution Description: To address this vulnerability, the fix involves replacing the `assert()` statement with a `require()` statement. The `require()` function is more appropriate in scenarios where a failure indicates a recoverable error condition that might be expected under certain circumstances. Unlike `assert()`, which implies a critical failure, `require()` allows the developer to specify a condition that should normally hold, along with a corresponding revert message when it does not. The modified code change introduces this shift by using `require(m[keccak256(abi.encodePacked(x, "B"))] == 0, "Condition failed");`. This change ensures that if the condition fails (due to a hash collision or other means), the function call is reverted safely, providing a meaningful error message ("Condition failed") to the user, which facilitates debugging and improves contract reliability.
+

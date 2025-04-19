@@ -1,0 +1,92 @@
+vulnerable code:
+/*
+ * @source: https://github.com/ConsenSys/evm-analyzer-benchmark-suite
+ * @author: Suhabe Bugrara
+ */
+
+
+
+
+pragma solidity ^0.4.23;
+
+contract IntegerOverflowMultiTxOneFuncFeasible {
+ uint256 private initialized = 0;
+ uint256 public count = 1;
+
+ function run(uint256 input) public {
+ if (initialized == 0) {
+ initialized = 1;
+ return;
+ }
+
+ count -= input;
+ }
+}
+
+
+Abstract purpose: The code snippet demonstrates a smart contract that is vulnerable to integer overflow attacks.
+
+Detail Behaviors: 
+1. The contract initializes a private variable 'initialized' to 0 and a public variable 'count' to 1.
+2. The 'run' function decreases the 'count' variable by the input value if 'initialized' is not equal to 0.
+3. The contract is susceptible to integer overflow if the input is sufficiently large, potentially causing unexpected behavior.
+
+fixed code:
+/*
+ * @source: https://github.com/ConsenSys/evm-analyzer-benchmark-suite
+ * @author: Suhabe Bugrara
+ */
+
+
+
+
+pragma solidity ^0.4.23;
+
+contract IntegerOverflowMultiTxOneFuncFeasible {
+
+ uint256 private initialized = 0;
+ uint256 public count = 1;
+
+ function run(uint256 input) public {
+ if (initialized == 0) {
+ initialized = 1;
+ return;
+ }
+
+ count = sub(count, input);
+ }
+
+ 
+ function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b <= a);
+ return a - b;
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability consists of improper handling of arithmetic operations on unsigned integers, leading to a potential wrap-around effect. This is due to the absence of validation checks on input values, which allows them to surpass boundaries during arithmetic operations, thereby causing integer underflows. Such conditions can result in incorrect logic flow or malicious exploitation when large unintended values are assigned.
+
+Trigger Action: The vulnerability is triggered when an arithmetic operation, specifically subtraction, is performed without proper validation of input values, leading to an integer underflow when the value to be subtracted exceeds the operand.
+
+            Detailed Vulnerability Description: The code snippet originally demonstrates a classic example of an integer underflow vulnerability, identified as SWC-101. This vulnerability occurs in the `run` function of the contract `IntegerOverflowMultiTxOneFuncFeasible`. Here's how it manifests:
+
+- **Control Flow Vulnerability:** While the function checks if the contract is initialized only once, it does not impose any checks on the value of `input` relative to `count` in subsequent calls after initialization. This means that if `input` is greater than `count`, subtracting `input` from `count` would result in an underflow. In Solidity, prior to version 0.8.0, unsigned integer underflows wrap around, causing the value to revert to a very large number instead of resulting in an error. Hence, `count` could unintentionally become a large number, resulting in unintended behavior or exploitation of the contract logic.
+
+###
+            Solution Description: To mitigate the underflow vulnerability present in the original code, the following modifications were made:
+
+- **Implementation of a Safe Arithmetic Function:** The modified code uses a helper function `sub` to safely perform subtraction. This internal function applies a pre-check to enforce that the `input` value (`b`) does not exceed `count` (`a`). It leverages the `require` statement to ensure that this condition holds true. If `b` is greater than `a`, the `require` statement will trigger a transaction revert, effectively preventing the underflow from occurring.
+
+- **Conditional Validation:** Adding `require(b <= a);` inside the `sub` function ensures that attempts to cause an underflow will be immediately blocked. This is critical as it actively validates input parameters before performing arithmetic operations, maintaining the contract's integrity.
+
+This modification fosters robustness in the smart contract by guarding against arithmetic edge cases such as underflows. More generally, usage of utility libraries like OpenZeppelin's SafeMath is recommended for handling such situations, as these libraries provide battle-tested and community-reviewed solutions for safe arithmetic operations in Solidity.
+
+### Generalizable Specific Behavior Leading to Vulnerability:
+
+- **Lack of Bounds Checking:** The original code does not enforce checks on arithmetic operations to ensure they stay within safe bounds, making it susceptible to underflows when operations are performed on unsigned integers.
+
+- **Inadequate Input Validation:** Failing to validate inputs in such a way that assumptions about their safe range are verified before performing critical operations.
+
+### Specific Solution to Fix:
+
+- **Use of SafeMath/Custom Verification Functions:** Implementing bounded arithmetic using assertions, as achieved with a `require` statement in a helper function, actively validates assumptions about input ranges prior to performing potentially error-prone arithmetic. This pattern ensures that arithmetic operations remain within valid bounds, thereby averting vulnerabilities.

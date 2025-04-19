@@ -1,0 +1,60 @@
+vulnerable code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ */
+pragma solidity ^0.4.21;
+
+contract GasModel{
+ uint x = 100;
+ function check(){
+ uint a = gasleft();
+ x = x + 1;
+ uint b = gasleft();
+ assert(b > a);
+ }
+}
+
+
+Abstract purpose: The code snippet aims to demonstrate a simple Smart Contract in Solidity that checks gas consumption during execution.
+
+Detail Behaviors:
+1. Initialize a state variable 'x' with the value 100.
+2. Define a function 'check' that measures gas consumption before and after modifying 'x' and asserts that gas consumption has increased.
+
+
+fixed code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ */
+pragma solidity ^0.4.21;
+
+contract GasModelFixed{
+ uint x = 100;
+ function check(){
+ uint a = gasleft();
+ x = x + 1;
+ uint b = gasleft();
+ assert(b < a);
+ }
+}
+
+
+Abstract Vulnerability Description: Misinterpretation of the Ethereum gas consumption model, leading to incorrect assertion logic that expects an increase in remaining gas during execution. This flaw arises from using assertions based on invalid assumptions regarding gas usage during the state-modifying operations in a smart contract.
+
+Trigger Action: Execution of an assert statement that incorrectly expects the remaining gas to be greater after a series of operations, contrary to the Ethereum gas usage model which results in an assertion failure due to flawed logic.
+
+            Detailed Vulnerability Description: **Vulnerability Type: Gas Usage Assertion - SWC-110**
+
+The original code snippet contained an assert statement `assert(b > a);` that checked if the gas left after executing a set of operations was greater than the gas left before those operations. This assertion reflects a misunderstanding of gas consumption in Ethereum smart contracts. Each operation costs gas, thus, logically, the gas left after executing additional operations (especially those that modify state, like `x = x + 1;`) is expected to be less than or equal to the gas left before these operations commenced. A failing assertion signifies that an invariant integral to contract operation has been violated, potentially leading to undesirable outcomes.
+
+The specific vulnerability lies in incorrectly assuming that `gasleft()` increases during execution, leading to a reachability of the failing assert statement. This results in an assertion failure during proper operation as it contradicts the inherent nature of gas usage in execution.
+
+### Solution Description:
+
+To rectify this, the code was modified as follows:
+
+- **Correct Assertion of Gas Consumption Invariant:** In the updated version, the assertion has been modified to `assert(b < a);`. This revision accurately reflects the expected behavior of Ethereum's gas model, where gas remaining after execution of additional operations is logically less due to gas consumption by the operations.
+
+- **Behavior Change:** By changing the assertion from `b > a` to `b < a`, the condition now appropriately guards the contract's logic invariant on gas usage. The assertion ensures that, as expected, the execution of instructions between the two `gasleft()` calls results in reduced remaining gas, which prevents the inappropriate triggering of assertion failures.

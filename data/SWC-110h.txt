@@ -1,0 +1,96 @@
+vulnerable code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ * Assert violation with 2 message calls:
+ * - B.set_x(X): X != 10
+ * - ContructorCreateModifiable.check()
+ */
+
+pragma solidity ^0.4.22;
+
+contract ContructorCreateModifiable{
+ B b = new B(10);
+
+ function check(){
+ assert(b.foo() == 10);
+ }
+
+}
+
+contract B{
+
+ uint x_;
+ constructor(uint x){
+ x_ = x;
+ }
+
+ function foo() returns(uint){
+ return x_;
+ }
+
+ function set_x(uint x){
+ x_ = x;
+ }
+}
+
+
+Abstract purpose: Ensure that the value of x in contract B is set to 10 during initialization and that the function check in the ContructorCreateModifiable contract enforces this constraint.
+
+Detail Behaviors:
+1. Contract ContructorCreateModifiable creates an instance of contract B with x set to 10.
+2. Function check in ContructorCreateModifiable asserts that the value returned by B's foo function is 10.
+3. Contract B contains functions to get the value of x and set a new value for x.
+
+fixed code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ * Fixed version: assert() replaced with require()
+ */
+
+pragma solidity ^0.4.22;
+
+contract ContructorCreateModifiable {
+ B b = new B(10);
+
+ function check() public {
+ require(b.foo() == 10, "Value mismatch!");
+ }
+}
+
+contract B {
+ uint x_;
+ constructor(uint x) public {
+ x_ = x;
+ }
+
+ function foo() public returns(uint) {
+ return x_;
+ }
+
+ function set_x(uint x) public {
+ x_ = x;
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability arises from the inappropriate use of assertions (`assert()`) for condition checks influenced by external factors or mutable state. Assertions should be reserved for validating invariant conditions that should never fail. Misusing `assert()` in contexts where conditions can change leads to severe consumption of gas and lack of informative feedback when the assertion fails, potentially caused by user interaction or changes in state.
+
+Trigger Action: The vulnerability is triggered by invoking functions or actions that alter the state in such a way that violates the condition enforced by `assert()`, specifically when conditions or variables that are influenced by external user inputs or contract state changes fail to meet the asserted expectations.
+
+            Detailed Vulnerability Description: - **Nature of Assert Violation**: The Solidity `assert()` function is designed to catch internal errors and verify conditions that should always hold true. The intended use of `assert()` is for testing invariants. If an assertion fails, it typically indicates a problem in the contract code or an invariant that was assumed to always be true has been broken. In the original code, `assert(b.foo() == 10)` is used within the `check()` function to guarantee that the value returned by `foo()` is 10. However, the logic permits modifying the value of `x_` via the `set_x()` function, potentially leading to an assertion failure when `set_x()` is called with a value other than 10.
+- **Consequences**: A failing `assert()` will consume all remaining gas and does not return any information to the caller, causing a costly failure for the user without a descriptive error message.
+
+###
+            Solution Description: - **Replacement with `require()`**: The problematic `assert()` statement is replaced with `require()` in the fixed version of the contract. The `require()` function is more suited for input validation and conditions that depend on user input and external calls. If a `require()` statement evaluates to false, the transaction is reverted with a specified error message, in this case, "Value mismatch!". This provides a clear indication of why the transaction failed while also ensuring any consumed gas that exceeded the transaction's limit is reverted to the caller.
+- **Public Visibility Modifier**: Additionally, the visibility of the constructor and functions are explicitly marked as `public`, enhancing clarity and confirming that these functions are accessible externally.
+
+### Generalizable Specific Behavior Leading to Vulnerability:
+- **Misuse of `assert()` for Conditional Checks**: Employing `assert()` for checks that can fail due to external user action or mutable state changes is a misuse. Such assertions are inappropriate for variable conditions that may not hold due to external interactions or logic flow changes.
+
+### Generalizable Solution:
+- **Prescriptive Use of `require()`**: Use `require()` instead of `assert()` for validating conditions resulting from user inputs or external factors. This ensures that if the condition fails, any consumed gas will be appropriately reverted, and a meaningful error message will be provided to the user, guiding them on why the transaction reverted.
+- **Explicit Visibility**: Define the visibility of functions and constructors facily and clearly to avoid any misunderstandings regarding their accessibility from outside the contract. This adds clarity and reduces the chances of unintended contract states from occurring due to visibility mismatches.
+
+By adhering to these guidelines, contract developers can help safeguard their smart contracts from falling prey to similar vulnerabilities, ensuring they function smoothly and maintain expected behavior across various state changes and user interactions.

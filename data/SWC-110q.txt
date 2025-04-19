@@ -1,0 +1,179 @@
+vulnerable code:
+/*
+ * @source: https://forum.zeppelin.solutions/t/using-automatic-analysis-tools-with-makerdao-contracts/1021/3
+ * Author: Vera Bogdanich Espina / Zeppelin Solutions
+ *
+ * A simplified version of the MakerDAO DSChief contract.
+*  Tools should output the correct transaction trace (see source link).
+*/
+
+contract SimpleDSChief {
+ mapping(bytes32=>address) public slates;
+ mapping(address=>bytes32) public votes;
+ mapping(address=>uint256) public approvals;
+ mapping(address=>uint256) public deposits;
+
+ function lock(uint wad) public {
+ deposits[msg.sender] = add(deposits[msg.sender], wad);
+ addWeight(wad, votes[msg.sender]);
+ }
+
+ function free(uint wad) public {
+ deposits[msg.sender] = sub(deposits[msg.sender], wad);
+ subWeight(wad, votes[msg.sender]);
+ }
+
+ function voteYays(address yay) public returns (bytes32){
+ bytes32 slate = etch(yay);
+ voteSlate(slate);
+
+ return slate;
+ }
+
+ function etch(address yay) public returns (bytes32 slate) {
+ bytes32 hash = keccak256(abi.encodePacked(yay));
+
+ slates[hash] = yay;
+
+ return hash;
+ }
+
+ function voteSlate(bytes32 slate) public {
+ uint weight = deposits[msg.sender];
+ subWeight(weight, votes[msg.sender]);
+ votes[msg.sender] = slate;
+ addWeight(weight, votes[msg.sender]);
+ }
+
+ function addWeight(uint weight, bytes32 slate) internal {
+ address yay = slates[slate];
+ approvals[yay] = add(approvals[yay], weight);
+ }
+
+ function subWeight(uint weight, bytes32 slate) internal {
+ address yay = slates[slate];
+ approvals[yay] = sub(approvals[yay], weight);
+ }
+
+ function add(uint x, uint y) internal pure returns (uint z) {
+ require((z = x + y) >= x);
+ }
+
+ function sub(uint x, uint y) internal pure returns (uint z) {
+ require((z = x - y) <= x);
+ }
+
+ function checkAnInvariant() public {
+ bytes32 senderSlate = votes[msg.sender];
+ address option = slates[senderSlate];
+ uint256 senderDeposit = deposits[msg.sender];
+
+ assert(approvals[option] >= senderDeposit);
+ }
+}
+
+
+Abstract purpose: Demonstrating a simplified version of the MakerDAO DSChief contract.
+
+Detail Behaviors: 
+1. Lock function: Increases the user's deposit and weight in the voting process.
+2. Free function: Decreases the user's deposit and weight in the voting process.
+3. voteYays function: Records a vote for a particular option and returns the slate.
+4. etch function: Maps an address to a unique hash as part of the voting process.
+5. voteSlate function: Allows a user to vote on a specific slate.
+6. addWeight function: Adds weight to the approvals for a particular option.
+7. subWeight function: Subtracts weight from the approvals for a particular option.
+8. add function: Safely adds two unsigned integers.
+9. sub function: Safely subtracts one unsigned integer from another.
+10. checkAnInvariant function: Checks an invariant in the voting process to ensure correctness.
+
+fixed code:
+/*
+ * @source: https://forum.zeppelin.solutions/t/using-automatic-analysis-tools-with-makerdao-contracts/1021/3
+ * Author: Vera Bogdanich Espina / Zeppelin Solutions
+ *
+ * A simplified version of the MakerDAO DSChief contract.
+ * Tools should output the correct transaction trace (see source link).
+ */
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.4.22;
+
+contract SimpleDSChief {
+    mapping(bytes32 => address) public slates;
+    mapping(address => bytes32) public votes;
+    mapping(address => uint256) public approvals;
+    mapping(address => uint256) public deposits;
+
+    function lock(uint wad) public {
+        deposits[msg.sender] = add(deposits[msg.sender], wad);
+        addWeight(wad, votes[msg.sender]);
+    }
+
+    function free(uint wad) public {
+        deposits[msg.sender] = sub(deposits[msg.sender], wad);
+        subWeight(wad, votes[msg.sender]);
+    }
+
+    function voteYays(address yay) public returns (bytes32) {
+        bytes32 slate = etch(yay);
+        voteSlate(slate);
+        return slate;
+    }
+
+    function etch(address yay) public returns (bytes32 slate) {
+        bytes32 hash = keccak256(abi.encodePacked(yay));
+        slates[hash] = yay;
+        return hash;
+    }
+
+    function voteSlate(bytes32 slate) public {
+        uint weight = deposits[msg.sender];
+        subWeight(weight, votes[msg.sender]);
+        votes[msg.sender] = slate;
+        addWeight(weight, votes[msg.sender]);
+    }
+
+    function addWeight(uint weight, bytes32 slate) internal {
+        address yay = slates[slate];
+        approvals[yay] = add(approvals[yay], weight);
+    }
+
+    function subWeight(uint weight, bytes32 slate) internal {
+        address yay = slates[slate];
+        approvals[yay] = sub(approvals[yay], weight);
+    }
+
+    function add(uint x, uint y) internal pure returns (uint z) {
+        require((z = x + y) >= x, "Addition overflow");
+    }
+
+    function sub(uint x, uint y) internal pure returns (uint z) {
+        require((z = x - y) <= x, "Subtraction underflow");
+    }
+
+    function checkAnInvariant() public {
+        bytes32 senderSlate = votes[msg.sender];
+        address option = slates[senderSlate];
+        uint256 senderDeposit = deposits[msg.sender];
+        require(approvals[option] >= senderDeposit);
+    }
+}
+
+Abstract Vulnerability Description: The vulnerability arises from the improper use of assertions to enforce contract invariants, which, if violated due to overlooked scenarios or manipulations, can lead to unintended halts in execution, thus exposing logical flaws in the contract's operation.
+
+Trigger Action: Initiating transactions or actions that inadvertently alter the state of key variables, such as `approvals[option]` or `senderDeposit`, without maintaining the intended invariant conditions, thereby triggering assertion failures.
+
+            Detailed Vulnerability Description: - **Context**: The vulnerable contract `SimpleDSChief` contains a function `checkAnInvariant()` that uses the `assert()` function to ensure that `approvals[option]` is always greater than or equal to `senderDeposit`.
+
+- **Nature of Vulnerability**: The usage of `assert()` is crucial as it is meant to ensure invariants that are expected to be unquestionably true at all times throughout execution. In the original code, if the assumption leading to the fact that `approvals[option] >= senderDeposit` is false could be violated due to overlooked circumstances, the `assert()` function may fail, causing undesired halts in execution and suggesting potential issues in the logic or assumptions of the contract execution paths.
+
+- **Behavior Leading to Vulnerability**: This happens potentially due to overlooked edge cases or mismanaged updates within transactions that modify `approvals[option]` or `senderDeposit`. If other parts of the code inadvertently or through unseen paths decrement `approvals[option]` or incorrectly handle `senderDeposit` without maintaining this invariant, it could lead to assertion violation.
+
+###
+            Solution Description: - **Modification Implementation**: Replace the `assert()` calls with `require()` which provides an opportunity to define a meaningful error message helping in diagnosing why the operation failed. `require()` is better suited for runtime condition checking rather than `assert()`, which is more suitable for enforcing logic invariants.
+
+- **Rationale**: The switch to `require()` with a descriptive error message is beneficial because it provides clarity to both developers and users, revealing exactly where the operation fails. Practically, it minimizes gas wastage from the Solidity runtime exception triggers by using a condition check that cancels the transaction if it’s not met, alongside rollback provisions. 
+
+- **Robustness**: Require checks ensure that instead of allowing unnecessary completion of operations until an assert statement, which leads to a higher cost, operations terminate early with a clear explanation, enhancing security, reducing the attack surface, and maintaining performance.
+

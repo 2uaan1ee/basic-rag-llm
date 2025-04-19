@@ -1,0 +1,56 @@
+vulnerable code:
+pragma solidity 0.4.25;
+
+contract ReturnValue {
+
+ function callchecked(address callee) public {
+ require(callee.call());
+ }
+
+ function callnotchecked(address callee) public {
+ callee.call();
+ }
+}
+
+
+Abstract purpose:
+This code snippet contains two functions that interact with other smart contracts by making an external call.
+
+Detail Behaviors: 
+1. The function `callchecked` makes an external call to the specified address and requires the call to be successful.
+2. The function `callnotchecked` makes an external call to the specified address without checking the return value.
+
+fixed code:
+pragma solidity 0.4.25;
+
+contract ReturnValue {
+
+ function callchecked(address callee) public {
+ require(callee.call(), "Call failed");
+ }
+
+ function callnotchecked(address callee) public {
+ bool success = callee.call();
+ require(success, "Call failed");
+ }
+}
+
+
+Abstract Vulnerability Description: **Failure to verify the success of external function invocations can lead to execution of undesirable states and potential exploitation of application logic due to unhandled error conditions.** This stems from the unchecked results of low-level function calls, which can result in unexpected or insecure contract behavior if the external operation fails but is not properly acknowledged or handled in the invoking contract.
+
+Trigger Action: **Execution of an external low-level function call without adequately checking its return status, particularly relying on the outcome of such calls without incorporating explicit error handling mechanisms.**
+
+            Detailed Vulnerability Description: **
+
+- The vulnerability identified as SWC-104 refers to "Unchecked Call Return Value." In the context of Solidity, the `call` operation in Solidity's 0.4.x version series returns a boolean indicating success or failure of the invoked function.
+- Originally, the function `callnotchecked` in the smart contract invoked `callee.call()` without examining its return value. Similarly, the function `callchecked` used `require` improperly, potentially overlooking specific exception handling sequences.
+- This unchecked behavior can cause critical issues if the external call fails, like reverting or throwing an error in the called contract, since the calling contract will continue its execution path ignoring failures. Such behavior can lead to security vulnerabilities where an attacker could deliberately cause function failures to exploit logical flows or game contract operations.
+
+**
+            Solution Description: **
+
+- The adjusted code addresses the vulnerability through two primary changes, ensuring the correct handling of call results.
+- In `callchecked`, the modification ensures that the Solidity `require` function checks both the return value of `callee.call()` and provides a meaningful error message (`"Call failed"`) upon failure.
+- Similarly, `callnotchecked` is modified to store the result of `callee.call()` in a boolean variable `success`. The subsequent `require` then checks this boolean, ensuring that the contract logic halts if the call operation fails, along with providing an explicit error message.
+- These corrections ensure that any failure in the low-level call results in a proper exception, maintaining consistent and expected behavior, preventing the contract from proceeding with erroneous states.
+

@@ -1,0 +1,105 @@
+vulnerable code:
+pragma solidity ^0.4.24;
+
+
+
+contract PredictTheBlockHashChallenge {
+
+ struct guess{
+ uint block;
+ bytes32 guess;
+ }
+
+ mapping(address => guess) guesses;
+
+ constructor() public payable {
+ require(msg.value == 1 ether);
+ }
+
+ function lockInGuess(bytes32 hash) public payable {
+ require(guesses[msg.sender].block == 0);
+ require(msg.value == 1 ether);
+
+ guesses[msg.sender].guess = hash;
+ guesses[msg.sender].block = block.number + 1;
+ }
+
+ function settle() public {
+ require(block.number > guesses[msg.sender].block);
+
+ bytes32 answer = blockhash(guesses[msg.sender].block);
+
+ guesses[msg.sender].block = 0;
+ if (guesses[msg.sender].guess == answer) {
+ msg.sender.transfer(2 ether);
+ }
+ }
+}
+
+
+Abstract purpose: This smart contract challenge allows users to guess a future block hash and receive a reward if their guess matches the actual hash.
+
+Detail Behaviors: 
+1. Users must send 1 ether to participate in the challenge.
+2. Users can lock in their guess for the block hash by providing a hash and submitting the required payment.
+3. When the block number surpasses the stored guess block number, the contract settles by checking the actual block hash against the user's guess.
+4. If the guess matches the actual hash, the user receives a reward of 2 ether.
+
+fixed code:
+pragma solidity ^0.4.24;
+
+
+
+contract PredictTheBlockHashChallenge {
+
+ struct guess{
+ uint block;
+ bytes32 guess;
+ }
+
+ mapping(address => guess) guesses;
+
+ constructor() public payable {
+ require(msg.value == 1 ether);
+ }
+
+ function lockInGuess(bytes32 hash) public payable {
+ require(guesses[msg.sender].block == 0);
+ require(msg.value == 1 ether);
+
+ guesses[msg.sender].guess = hash;
+ guesses[msg.sender].block = block.number + 1;
+ }
+
+ function settle() public {
+ require(block.number > guesses[msg.sender].block +10);
+ 
+ 
+ if(guesses[msg.sender].block - block.number < 256){
+ bytes32 answer = blockhash(guesses[msg.sender].block);
+
+ guesses[msg.sender].block = 0;
+ if (guesses[msg.sender].guess == answer) {
+ msg.sender.transfer(2 ether);
+ }
+ }
+ else{
+ revert("Sorry your lottery ticket has expired");
+ }
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability in question pertains to the improper utilization of block attributes as a source of randomness, which by their nature on a blockchain are susceptible to predictability and manipulation. Specifically, the reliance on recently mined blockhashes—potentially within the realm of control for miners—undermines the randomness needed for secure outcomes, particularly in scenarios where financial incentives invite manipulation, such as in lotteries or gambling applications.
+
+Trigger Action: The vulnerability is triggered by utilizing a miner-influenced or recent blockhash within a smart contract as an unpredictable variable, thereby allowing actors with sufficient resources to manipulate outcomes by controlling the blockhash value through the mining of successive blocks.
+
+            Detailed Vulnerability Description: - **Vulnerability Origin**: The core issue in the original contract was the reliance on `blockhash` to obtain a supposedly random value. The function `blockhash(uint blockNumber)` can be predictable and manipulatable by miners when used with a block number that is either too recent or falls within the set of blocks a miner can influence.
+- **Node Labeling Analysis**: In the original code, users lock in their guesses with the `lockInGuess` function and then, after a block has passed, they can call `settle`, which checks the guessed hash against the blockhash of the subsequent block. If a miner were able to produce several blocks in sequence, they could influence the blockhash to match a known pattern, thus compromising the outcome of the guess.
+- **Potential Exploit**: A miner with significant resources could potentially mine several blocks in sequence, capture the desired blockhash, and influence the result of the guessing game. This scenario becomes feasible if the blockhash is requested for a block recently mined.
+
+###
+            Solution Description: - **Security Enhancements**: The modification to the contract introduces a key check in the `settle` function. The modified version requires that the current block number must be at least 10 blocks ahead of the block number when the guess was locked (`block.number > guesses[msg.sender].block + 10`). This delay removes the miner's ability to cheaply manipulate the blockhash outcome as it constrains influence over the blockhash to a feasible block range that is no longer recent. 
+- **Expanded Checks**: There is also an additional amendment; the contract now checks if `guesses[msg.sender].block - block.number < 256`. This condition ensures compatibility with the `blockhash` function, which only returns reliable results for the most recent 256 blocks. Beyond this range, `blockhash` yields a zeroed hash (0x0), representing an unreliable source of randomization.
+- **Error Handling**: If either condition fails (i.e., if the blockhash has become stale or the time window is invalid), a revert is executed with an informative message: "Sorry your lottery ticket has expired". This prevents further execution and potential exploits.
+

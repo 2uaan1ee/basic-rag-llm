@@ -1,0 +1,62 @@
+vulnerable code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ */
+pragma solidity ^0.4.22;
+
+contract ShaOfSha2Mappings{
+
+ mapping(bytes32=>uint) m;
+ mapping(bytes32=>uint) n;
+
+ constructor(){
+ m[keccak256(abi.encode("AAA", msg.sender))] = 100;
+ }
+
+ function check(address a){
+ assert(n[keccak256(abi.encode("BBB", a))] == 0);
+ }
+
+}
+
+
+Abstract purpose: Implementing a smart contract with mappings to store data based on hash values.
+
+Detail Behaviors: 
+1. Constructor initializes a mapping with a key-value pair using keccak256 hash value of encoded string concatination.
+2. Function `check` is used to assert that a specific key in mapping `n` has a value of 0 based on the hash value of the input address.
+
+fixed code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ */
+pragma solidity ^0.4.22;
+
+contract ShaOfSha2Mappings{
+
+ mapping(bytes32=>uint) m;
+ mapping(bytes32=>uint) n;
+
+ constructor(){
+ m[keccak256(abi.encode("AAA", msg.sender))] = 100;
+ }
+
+ function check(address a) public {
+ require(n[keccak256(abi.encode("BBB", a))] == 0, "Mapping value is not zero!");
+ }
+
+}
+
+
+Abstract Vulnerability Description: The vulnerability originates from the inappropriate use of a Solidity function intended for enforcing invariants, leading to excessive resource consumption and inadequate error reporting. This occurs when a critical function is misapplied to validate conditions that may fail under typical contract interactions, resulting in a significant logic flaw and a lack of user-centric feedback.
+
+Trigger Action: The vulnerability is triggered by utilizing the `assert()` function to evaluate a condition that fails to meet criteria expected to be invariant; its failure induces an unnecessary consumption of all remaining gas and provides no informative feedback to the user.
+
+            Detailed Vulnerability Description: The SWC-110 vulnerability in the provided smart contract arises due to the misuse of the `assert()` function. The `assert()` function in Solidity is utilized to enforce invariants and is expected not to be triggered under normal operational circumstances. If an `assert()` condition fails, it indicates a critical flaw in the contract's logic, as this function will consume all remaining gas and revert changes without providing any meaningful error messages to the user.
+
+In the initial code snippet, the contract contains a mapping `n` which is checked using `assert()`. The conditional `assert(n[keccak256(abi.encode("BBB", a))] == 0)` introduces a problem because if the condition fails, it results in a gas-heavy operation that provides no feedback to the contract user, making debugging and understanding issues challenging.
+
+###
+            Solution Description: The modification replaces the `assert()` with `require()`, specifically `require(n[keccak256(abi.encode("BBB", a))] == 0, "Mapping value is not zero!");`. The `require()` function is more suitable for input validation and condition checks that could fail due to external reasons not necessarily reflecting a critical logic error in the contract. When a `require()` condition fails, it reverts the transaction and provides a customizable error message, "Mapping value is not zero!", offering more transparency and usability for contract interactions.

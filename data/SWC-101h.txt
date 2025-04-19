@@ -1,0 +1,116 @@
+vulnerable code:
+/*
+ * @source: https://capturetheether.com/challenges/math/token-sale/
+ * @author: Steve Marx
+ */
+
+pragma solidity ^0.4.21;
+
+contract TokenSaleChallenge {
+ mapping(address => uint256) public balanceOf;
+ uint256 constant PRICE_PER_TOKEN = 1 ether;
+
+ function TokenSaleChallenge(address _player) public payable {
+ require(msg.value == 1 ether);
+ }
+
+ function isComplete() public view returns (bool) {
+ return address(this).balance < 1 ether;
+ }
+
+ function buy(uint256 numTokens) public payable {
+ require(msg.value == numTokens * PRICE_PER_TOKEN);
+
+ balanceOf[msg.sender] += numTokens;
+ }
+
+ function sell(uint256 numTokens) public {
+ require(balanceOf[msg.sender] >= numTokens);
+
+ balanceOf[msg.sender] -= numTokens;
+ msg.sender.transfer(numTokens * PRICE_PER_TOKEN);
+ }
+}
+
+
+Abstract purpose: Implementation of a token sale challenge contract.
+
+Detail Behaviors: 
+1. Initialize a mapping to track token balances for addresses.
+2. Define the constant price per token as 1 ether.
+3. Constructor function that requires 1 ether payment upon deployment.
+4. Check if the contract balance is less than 1 ether.
+5. Allow users to buy tokens by paying the appropriate amount.
+6. Enable users to sell tokens and receive payment in return.
+
+fixed code:
+/*
+ * @source: https://capturetheether.com/challenges/math/token-sale/
+ * @author: Steve Marx
+ * @fix: Prevent integer overflow in buy() function
+ */
+
+pragma solidity ^0.4.21;
+
+library SafeMath {
+ function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+ if (a == 0) return 0;
+ uint256 c = a * b;
+ require(c / a == b);
+ return c;
+ }
+}
+
+contract TokenSaleChallenge {
+ using SafeMath for uint256;
+
+ mapping(address => uint256) public balanceOf;
+ uint256 constant PRICE_PER_TOKEN = 1 ether;
+
+ function TokenSaleChallenge(address _player) public payable {
+ require(msg.value == 1 ether);
+ }
+
+ function isComplete() public view returns (bool) {
+ return address(this).balance < 1 ether;
+ }
+
+ function buy(uint256 numTokens) public payable {
+ uint256 requiredValue = numTokens.mul(PRICE_PER_TOKEN);
+ require(msg.value == requiredValue);
+
+ balanceOf[msg.sender] += numTokens;
+ }
+
+ function sell(uint256 numTokens) public {
+ require(balanceOf[msg.sender] >= numTokens);
+
+ balanceOf[msg.sender] -= numTokens;
+ msg.sender.transfer(numTokens.mul(PRICE_PER_TOKEN));
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability involves an unchecked arithmetic operation, specifically an integer overflow in the calculation of token purchase cost. This occurs when a large multiplication operation within a function exceeds the maximum allowable value for a data type, leading to a wrap-around effect and incorrect calculation, which may be exploited to execute transactions without sending the proper value or disrupting expected contract behavior.
+
+Trigger Action: Initiating the vulnerability is the execution of a function that includes an unchecked multiplication operation with user-input values, resulting in a calculation that exceeds the data type's capacity, thus leading to an arithmetic overflow.
+
+            Detailed Vulnerability Description: **
+
+The vulnerability arises from the `buy()` function, particularly due to the unchecked arithmetic operation involved when computing the cost to purchase tokens: `numTokens * PRICE_PER_TOKEN`. If `numTokens` is sufficiently large, this multiplication can result in an overflow. Solidity's `uint256` type has a maximum value of `2^256 - 1`. If an overflow occurs, the value wraps around, potentially allowing less ETH to be sent than required to purchase a large number of tokens. This allows a malicious actor to purchase tokens without sending the correct amount of ether.
+
+In the context of Ethereum, an overflow happens because Solidity 0.4.21, the version used in this contract, does not provide built-in safety checks for arithmetic operations, leading to the potential for integer overflows with subsequent loss of token value or incorrect logic execution.
+
+**
+            Solution Description: **
+
+The fix employs the `SafeMath` library, which provides arithmetic functions with integrity checks that prevent overflows. Specifically:
+
+- **Use of SafeMath's `mul` function:** The `SafeMath.mul` method is utilized to perform the multiplication safely. It checks if there is an overflow during the multiplication process by ensuring that when you divide the product by one multiplicand you get the other multiplicand back. If not, it raises a `require` violation, effectively preventing unsafe operations.
+
+- **Safe Arithmetic Operations:** By wrapping the multiplication `numTokens * PRICE_PER_TOKEN` in the `SafeMath.mul` method, the function guarantees that any multiplication that results in a condition leading to overflow will throw an exception, thus reverting the transaction.
+
+- **Code Changes in Functions:**
+  - In `buy()`, the line `uint256 requiredValue = numTokens.mul(PRICE_PER_TOKEN);` safely computes the price using `SafeMath`, ensuring multiplication doesn't overflow.
+  - Similarly, the `sell()` function uses `numTokens.mul(PRICE_PER_TOKEN)` wrapped in `SafeMath` to secure the payout calculations.
+

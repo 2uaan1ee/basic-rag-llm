@@ -1,0 +1,97 @@
+vulnerable code:
+pragma solidity ^0.5.0;
+
+contract ModifierEntrancy {
+
+ mapping (address => uint) public tokenBalance;
+ string constant name = "Nu Token";
+ Bank bank;
+
+ constructor() public{
+ bank = new Bank();
+ }
+
+ 
+ function airDrop() hasNoBalance supportsToken public{
+ tokenBalance[msg.sender] += 20;
+ }
+
+ 
+ modifier supportsToken() {
+ require(keccak256(abi.encodePacked("Nu Token")) == bank.supportsToken());
+ _;
+ }
+
+ 
+ modifier hasNoBalance {
+ require(tokenBalance[msg.sender] == 0);
+ _;
+ }
+}
+
+contract Bank{
+
+ function supportsToken() external returns(bytes32) {
+ return keccak256(abi.encodePacked("Nu Token"));
+ }
+
+}
+
+
+Abstract purpose: To handle the transfer of tokens with specific modifiers.
+
+Detail Behaviors: 
+1. Constructor initializes a Bank contract.
+2. airDrop function increases the token balance of the sender by 20.
+3. supportsToken modifier ensures the Bank contract supports the "Nu Token" token.
+4. hasNoBalance modifier checks if the sender has a token balance of 0 before executing the function.
+
+fixed code:
+pragma solidity ^0.5.0;
+
+contract ModifierEntrancy {
+ mapping (address => uint) public tokenBalance;
+ string constant name = "Nu Token";
+ Bank bank;
+ constructor() public{
+ bank = new Bank();
+ }
+
+ 
+ function airDrop() supportsToken hasNoBalance public{ 
+ tokenBalance[msg.sender] += 20;
+ }
+
+ 
+ modifier supportsToken() {
+ require(keccak256(abi.encodePacked("Nu Token")) == bank.supportsToken());
+ _;
+ }
+ 
+ modifier hasNoBalance {
+ require(tokenBalance[msg.sender] == 0);
+ _;
+ }
+}
+
+contract Bank{
+
+ function supportsToken() external returns(bytes32){
+ return(keccak256(abi.encodePacked("Nu Token")));
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability arises from reentrancy, a condition where an external contract call allows the execution of newly invoked functions in an unexpected sequence. This occurs when contract operations involving state changes and external calls are improperly ordered, making the contract susceptible to unauthorized recursive actions that exploit timing and order of operations to alter execution flow or manipulate state data.
+
+Trigger Action: An external call made by a contract function (such as to another contract's function) that allows a callback to alter or re-initiate state-altering functions before the original function's logic is completed.
+
+            Detailed Vulnerability Description: In the initial code snippet, the potential for a reentrancy vulnerability arises from the sequencing of modifier calls and state updates on the `airDrop()` function. Specifically, the `hasNoBalance` modifier appears after the `supportsToken` modifier. This order caused issues because the `supportsToken` modifier invokes an external call to the `Bank` contract's `supportsToken()` function:
+- **Control Flow Risk:** When a modifier calls an external contract, this external contract could execute a callback function elsewhere in the original contract before the first execution of the function's logic is completed. This may result in multiple interactions with the function that haven't been planned or controlled properly.
+- **State Variables:** The `hasNoBalance` modifier (checking if `tokenBalance[msg.sender]` is zero) executes after the external call, potentially allowing a malicious contract to falsify states or repeatedly invoke `airDrop()` to draw excessive tokens.
+
+###
+            Solution Description: The modification resolves the vulnerability by reordering the application of the modifiers in the `airDrop()` function, such that `supportsToken` precedes `hasNoBalance`:
+- **Modify Order of Operations:** By changing the modifier order to `supportsToken` followed by `hasNoBalance`, the contract verifies token support before ensuring the balance is zero. This ensures the external call is made first, so any potential malicious attempts can't use reentrancy to bypass the balance check.
+- **Safe External Calls:** Ensure that all external calls (like those to `supportsToken()` from the `Bank` contract) are done before crucial state-altering operations, reducing the reentrancy risk. Additionally, always ensure that state-altering logic is safe and completed before performing external interactions.
+

@@ -1,0 +1,104 @@
+vulnerable code:
+/*
+ * @source: https://forum.zeppelin.solutions/t/using-automatic-analysis-tools-with-makerdao-contracts/1021/3
+ * Author: Dan Guido / Trail of Bits
+ * Slightly modified by Bernhard Mueller
+
+* An assertion violation is possible in 3 transactions:
+*
+* etch(addr)
+* lookup(slate, addr)
+* checkAnInvariant()
+
+* Whereby slate == Keccak(addr)
+*
+* Ideally tools should output the correct transaction trace.
+*/
+
+pragma solidity ^0.5.0;
+
+contract ReturnMemory {
+ mapping(bytes32=>address) public slates;
+ bool everMatched = false;
+
+ function etch(address yay) public returns (bytes32 slate) {
+ bytes32 hash = keccak256(abi.encodePacked(yay));
+ slates[hash] = yay;
+ return hash;
+ }
+
+ function lookup(bytes32 slate, address nay) public {
+ if (nay != address(0x0)) {
+ everMatched = slates[slate] == nay;
+ }
+ }
+
+ function checkAnInvariant() public returns (bool) {
+ assert(!everMatched);
+ }
+}
+
+
+Abstract purpose: The purpose of the code snippet is to demonstrate the potential assertion violation in specific transactions and the importance of correct transaction tracing.
+
+Detail Behaviors:
+1. The etch function calculates a hash from an address and stores the mapping in the slates storage.
+2. The lookup function compares an address with the stored mapping under a specific condition.
+3. The checkAnInvariant function verifies the invariant condition that was set and triggers an assertion if violated.
+
+fixed code:
+/*
+ * @source: https://forum.zeppelin.solutions/t/using-automatic-analysis-tools-with-makerdao-contracts/1021/3
+ * Author: Dan Guido / Trail of Bits
+ * Slightly modified by Bernhard Mueller
+
+ * An assertion violation is possible in 3 transactions:
+ *
+ * etch(addr)
+ * lookup(slate, addr)
+ * checkAnInvariant()
+ *
+ * Whereby slate == Keccak(addr)
+ *
+ * Ideally tools should output the correct transaction trace.
+ */
+
+pragma solidity ^0.5.0;
+
+contract ReturnMemory {
+ mapping(bytes32 => address) public slates;
+ bool everMatched = false;
+
+ function etch(address yay) public returns (bytes32 slate) {
+ bytes32 hash = keccak256(abi.encodePacked(yay));
+ slates[hash] = yay;
+ return hash;
+ }
+
+ function lookup(bytes32 slate, address nay) public {
+ if (nay != address(0x0)) {
+ everMatched = (slates[slate] == nay);
+ }
+ }
+
+ function checkAnInvariant() public returns (bool) {
+ require(!everMatched, "Invariant violated: everMatched is true!");
+ return true;
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability arises from the improper use of an internal logic validation mechanism, potentially leading to unexpected execution halts and logical inconsistencies in how invariants are enforced within the contract. This is caused by failing to distinguish between contract internal errors and conditions that could be instigated by external interactions, thereby indicating a latent logical flaw that can manifest under specific transaction circumstances.
+
+Trigger Action: Invoking actions that could alter the state of the contract by combining mechanisms like address matching and specific value lookups (`etch(addr)`, `lookup(slate, addr)`, `checkAnInvariant()`). These actions alter the expected invariant state, triggering the inappropriate logic validation check.
+
+            Detailed Vulnerability Description: **
+
+The original code snippet contains a critical vulnerability categorized under SWC-110: Assert Violation. This occurs when the `assert()` function is utilized improperly, leading to potential unexpected failures during runtime. In Solidity, the `assert()` function is used to check for invariants within the code—conditions that should always hold true. If an `assert()` fails, it indicates a significant issue in the program logic. In the given code, the assert statement checks the `everMatched` boolean variable, ensuring that it remains false. However, under specific transaction conditions—namely utilizing `etch(addr)`, `lookup(slate, addr)`, and `checkAnInvariant()` where `slate = keccak256(addr)`—it is possible for `everMatched` to become true if an address is inappropriately matched. This potential for a failing assert indicates the presence of a latent logical flaw in the contract.
+
+**
+            Solution Description: **
+
+The modified code replaces the `assert()` function with a more appropriate `require()` function in the `checkAnInvariant()` method. The primary distinction between `assert()` and `require()` is in their use cases. While `assert()` is used to catch internal errors and to check invariants, `require()` is typically used to validate inputs and call conditions. The `require()` function provides a more meaningful mechanism to handle scenarios where conditions expected to be false are mistakenly true. By replacing the assert with require, the code now not only checks for the condition that should never be true but also provides an explicit error message ("Invariant violated: everMatched is true!") when the condition fails. This way, the contract can safely signal to the outside caller what went wrong, allowing for potential recovery or debugging, rather than simply halting execution with an ambiguous assert failure.
+
+The general lesson here is to use `require()` for input validations and conditions that can be influenced by external calls, and only resort to `assert()` for checking invariants and internal errors. Additionally, providing clear error messages within `require()` statements can greatly improve the transparency and debuggability of smart contracts.

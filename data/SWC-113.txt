@@ -1,0 +1,128 @@
+vulnerable code:
+/*
+ * @source: https://consensys.github.io/smart-contract-best-practices/known_attacks/#dos-with-unexpected-revert
+ * @author: ConsenSys Diligence
+ * Modified by Bernhard Mueller
+ */
+
+pragma solidity 0.4.24;
+
+contract Refunder {
+
+address[] private refundAddresses;
+mapping (address => uint) public refunds;
+
+ constructor() {
+ refundAddresses.push(0x79B483371E87d664cd39491b5F06250165e4b184);
+ refundAddresses.push(0x79B483371E87d664cd39491b5F06250165e4b185);
+ }
+
+ 
+ function refundAll() public {
+ for(uint x; x < refundAddresses.length; x++) { 
+ require(refundAddresses[x].send(refunds[refundAddresses[x]])); 
+ }
+ }
+
+}
+
+
+Abstract purpose: Refunder contract refunds Ether to specified addresses in a loop.
+
+Detail Behaviors:
+1. Constructor initializes refundAddresses with two specified addresses.
+2. refundAll function iterates through refundAddresses and sends refunds stored in the refunds mapping to each address.
+
+fixed code:
+pragma solidity 0.4.24;
+
+contract VulnerableRefunder {
+    address[] private recipients; // Changed to private to control access
+    mapping(address => uint) public balances;
+
+    constructor() public {
+        // Add some example recipients
+        recipients.push(0x1111111111111111111111111111111111111111);
+        recipients.push(0x2222222222222222222222222222222222222222);
+        recipients.push(0x3333333333333333333333333333333333333333);
+    }
+
+    // Allow deposits to fund the contract
+    function deposit() public payable {
+        require(msg.value > 0, "Must send ETH to deposit");
+    }
+
+    // Vulnerable function: pushes payments in a loop (SWC-113)
+    function distributePayments() public {
+        // Store initial balances
+        for (uint i = 0; i < recipients.length; i++) {
+            balances[recipients[i]] = 1 ether;
+        }
+
+        // Distribute payments - still vulnerable to SWC-113
+        for (uint j = 0; j < recipients.length; j++) {
+            require(
+                recipients[j].send(balances[recipients[j]]),
+                "Payment failed"
+            );
+            balances[recipients[j]] = 0;
+        }
+    }
+
+    // Function to add new recipient
+    function addRecipient(address newRecipient) public {
+        recipients.push(newRecipient);
+    }
+
+    // Safe getter for recipients with bounds checking
+    function getRecipient(uint index) public view returns (address) {
+        require(index < recipients.length, "Index out of bounds");
+        return recipients[index];
+    }
+
+    // Getter for recipients length
+    function getRecipientsCount() public view returns (uint) {
+        return recipients.length;
+    }
+}
+
+Abstract Vulnerability Description: The identified vulnerability involves the potential for a Denial of Service (DoS) condition due to the handling of external calls within a loop. Specifically, the sequence of operations is such that if any external call (for instance, a fund transfer) encounters a failure—be it through an error or intentional interference by a malicious actor causing a revert—the entire transaction sequence is aborted. This failure propagates throughout the loop, leading to partial or total disruption of contract functionality, effectively locking funds and halting subsequent processes.
+
+Trigger Action: Initiation of the external call sequence within a loop, where each call attempts to transfer funds to potentially untrusted addresses or contracts. This action is triggered when attempting to perform batch payments or distributions, causing a complete function failure upon encountering any single revert within these external interactions.
+
+            Detailed Vulnerability Description: The vulnerability present in the initial smart contract, commonly known as "SWC-113", is the "Denial of Service (DoS) with Unexpected Revert". In the specific context of the provided code, the vulnerability arises from the use of external calls (i.e., sending payments) within a loop using `require(recipients[j].send(balances[recipients[j]]), "Payment failed")`. 
+
+The essence of this vulnerability is that if any of the external calls (e.g., sending Ether to an address) fails—whether accidentally due to a reverted transaction, or deliberately by a malicious actor overriding the receiver contract’s `fallback` or `receive` functions to always revert—the entire function `distributePayments` fails. This can indefinitely lock the contract's funds or prevent further operations, as all subsequent operations in the loop after the failed transaction won’t be processed.
+
+###
+            Solution Description: A safer approach, to mitigate this vulnerability, is to employ a "pull" payment model rather than the "push" model seen in the initial code. In a "pull" payment model, potential recipients have control over when they withdraw their funds, thereby isolating external call failures to individuals rather than affecting an entire transaction process. This method provides more resilience against DoS attacks due to external failures.
+
+**General Steps for Mitigation:**
+
+1. **Use `withdraw` Pattern:**
+   - Rather than sending Ether directly in a loop, allow each recipient to individually withdraw their balance.
+   - Modify the contract to keep track of balances and provide a separate function that allows users to withdraw their funds themselves.
+
+2. **Avoid Inline External Calls in Loops:**
+   - Direct Ether transfers within loops should be replaced with function calls where possible, especially when involving untrusted addresses/contracts.
+   - Always utilize `transfer` or `call.value()` over `.send` for better error-handling control or utilize modern patterns like OpenZeppelin's `ReentrancyGuard` to secure fund transfers.
+
+3. **Ensure Sufficient Gas Stipend:**
+   - Adjust gas limits properly or use more gas-efficient ways to handle external calls, avoiding potential issues when handling numerous refunds.
+
+**Illustrative Code Structural Changes:**
+
+- Add a `function withdrawFunds()` that would allow recipients to call when they wish to withdraw their specific allocated balance.
+- The `distributePayments` logic would simply allocate balance amounts without sending Ether immediately.
+
+```solidity
+function withdrawFunds() public {
+    uint amount = balances[msg.sender];
+    require(amount > 0, "No funds to withdraw");
+    balances[msg.sender] = 0;
+    msg.sender.call.value(amount)("");
+    // Consider using a pattern like `msg.sender.call.value(amount)("")`
+    // to prevent reentrancy attacks ensure checks, effects, interactions pattern is observed.
+}
+```
+

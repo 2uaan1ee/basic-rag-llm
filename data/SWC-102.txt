@@ -1,0 +1,34 @@
+vulnerable code:
+pragma solidity 0.4.13;
+
+contract OutdatedCompilerVersion {
+ uint public x = 1;
+}
+
+
+Abstract purpose: Creating a basic Smart Contract with a public variable x initialized to 1.
+
+Detail Behaviors: 
+1. Declares a Solidity smart contract named OutdatedCompilerVersion.
+2. Defines a public uint variable x with an initial value of 1.
+
+fixed code:
+pragma solidity ^0.8.20;
+
+contract UpdatedCompilerVersion {
+    uint public x = 1;
+}
+
+
+Abstract Vulnerability Description: Utilizing deprecated compiler versions in Solidity smart contracts exposes the code to unresolved security flaws, omitted improvements, and inefficiencies due to the lack of adoption of recent optimizations and security protocols inherent in newer compiler releases.
+
+Trigger Action: Specifying an outdated Solidity compiler version (e.g., `pragma solidity 0.4.13;`) during the contract's development and compilation process.
+
+            Detailed Vulnerability Description: The vulnerability identified here is associated with SWC-102, which pertains to the use of an outdated compiler version. Using an older compiler, such as `pragma solidity 0.4.13;`, presents significant risks due to the potential presence of known bugs and security issues that have been
+            Solution Description: To mitigate the SWC-102 vulnerability, the solution involves upgrading to a more recent compiler version. In this instance, updating to `pragma solidity ^0.8.20;` achieves several benefits:
+
+1. **Access to Security Patches**: The updated compiler includes all recent security fixes and bug patches, significantly reducing vulnerabilities within the Solidity environment.
+2. **Modern Syntax and Features**: Newer compiler versions introduce syntactic improvements and new features, making contracts safer and more readable.
+3. **Enhanced Security Checks**: Versions in the 0.8.x range include integrated security checks, such as default arithmetic overflow protections, which contribute to more robust contract behavior.
+4. **Compatibility with Ecosystem Tools**: Keeping up with compiler updates ensures compatibility with the latest developer tools, auditing tools, and frameworks that enhance development workflows.
+

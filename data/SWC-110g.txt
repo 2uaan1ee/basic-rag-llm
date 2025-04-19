@@ -1,0 +1,85 @@
+vulnerable code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ */
+pragma solidity ^0.4.22;
+
+contract ConstructorCreateArgument{
+ B b = new B(11);
+
+ function check(){
+ assert(b.foo() == 10);
+ }
+
+}
+
+contract B{
+
+ uint x_;
+ constructor(uint x){
+ x_ = x;
+ }
+
+ function foo() returns(uint){
+ return x_;
+ }
+}
+
+
+Abstract purpose: The code snippet demonstrates usage of a constructor to create an instance of a contract with arguments. 
+
+Detail Behaviors: 
+1. The `ConstructorCreateArgument` contract creates an instance of contract `B` with the argument `11`.
+2. The `check` function in `ConstructorCreateArgument` asserts that the function `foo` in contract `B` returns `10`.
+3. The `B` contract contains a constructor that initializes a variable `x_` with the provided argument `x`.
+4. The `foo` function in contract `B` returns the value of the variable `x_`.
+
+fixed code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ */
+
+pragma solidity ^0.4.22;
+
+contract ConstructorCreateArgument {
+ B b = new B(11);
+
+ function check() public {
+ require(b.foo() == 10);
+ }
+}
+
+contract B {
+ uint x_;
+ constructor(uint x) public {
+ x_ = x;
+ }
+
+ function foo() public returns (uint) {
+ return x_;
+ }
+}
+
+
+Abstract Vulnerability Description: Misusing assertion mechanisms for validating conditions influenced by external factors or user inputs. This misuse leads to inefficient gas consumption and potential financial loss when these conditions, which might hold true or false under normal operational circumstances, fail. Assertions should be reserved for conditions that guarantee internal consistency, not to check logic that is contingent on external states.
+
+Trigger Action: Executing assert for validating the return value of an external method call which an external contract could alter, thereby leading to a contract state or condition heavily dependent on external inputs or other non-invariant factors.
+
+            Detailed Vulnerability Description: The original code uses the `assert` statement to check if the value returned by the function `foo` in contract `B` equals `10`. The `assert` function in Solidity is designed to enforce conditions that should never fail — essentially invariants — and is primarily used to catch programming errors. It should only be used to test internal errors and check invariance conditions.
+
+In this case, using `assert` to validate an external condition (the return value of `b.foo()`) is inappropriate because if `b.foo()` returns a value other than `10`, this does not generally indicate a programming error, but rather a logic or data inconsistency. If an `assert` fails, it consumes all the remaining gas given by the user, which can lead to unnecessary wastage of resources and financial cost to the transaction initiator.
+
+The issue here is that `assert` is employed for a condition that might not always hold true from a logic perspective, potentially reaching a failing state due to contract design or input, which is not aligned with its intended use for catching purely unforeseen internal errors.
+
+###
+            Solution Description: The fixed code replaces the `assert` with a `require` statement. The `require` function is more suitable for validating inputs and conditions at runtime because it performs checks that might not necessarily hold true based on user input or other runtime dynamics but are expected for the function to execute correctly. It is less severe than an `assert` failure because it can be used for conditions that might violate but do not imply a fault in the underlying program.
+
+The `require` statement is used in the fixed code to ensure that `b.foo()` equals `10`. If this condition is not met, the transaction will revert, but only the unused gas will be refunded to the user, making it a more appropriate handling mechanism for the situation described in the code. It provides a guard clause to verify that external expected conditions are met without exhausting all provided resources.
+
+### Generalizable Knowledge Extracted:
+- **Problematic Code Behavior:** Using `assert` for conditions based on external input or state checks. This misuse can result in unintentional gas wastage when such conditions fail and do not necessarily represent a logical error within the code.
+
+- **Solution Strategy:** Replace `assert` with `require` for checks where failure could occur due to controllable factors such as user inputs or data changes, ensuring only the necessary gas is consumed and giving appropriate feedback to the caller without penalizing them with full gas costs.
+

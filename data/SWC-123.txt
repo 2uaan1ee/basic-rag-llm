@@ -1,0 +1,52 @@
+vulnerable code:
+pragma solidity ^0.4.25;
+
+contract Bar {
+ Foo private f = new Foo();
+ function doubleBaz() public view returns (int256) {
+ return 2 * f.baz(0);
+ }
+}
+
+contract Foo {
+ function baz(int256 x) public pure returns (int256) {
+ require(0 < x);
+ return 42;
+ }
+}
+
+
+Abstract purpose:
+This code snippet defines two smart contracts, where contract Bar creates an instance of contract Foo and calls a function that doubles the output of the baz function in Foo.
+
+Detail Behaviors:
+1. Contract Bar creates an instance of contract Foo.
+2. Function doubleBaz in contract Bar returns two times the output of the baz function in contract Foo with argument 0.
+
+fixed code:
+pragma solidity ^0.4.25;
+
+contract Bar {
+ Foo private f = new Foo();
+ function doubleBaz() public view returns (int256) {
+ return 2 * f.baz(1); 
+ }
+}
+
+contract Foo {
+ function baz(int256 x) public pure returns (int256) {
+ require(0 < x); 
+ return 42;
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability is rooted in a scenario where internal function calls fail to adhere to pre-defined constraints, particularly due to insufficient input validation. This results in requirement violations that cause unintended transaction reversion, effectively rendering parts of the contract unusable and susceptible to potential denial of service.
+
+Trigger Action: The vulnerability is triggered when an internal function call (`f.baz(0)`) is made with an argument that does not satisfy the required precondition (`require(0 < x)`), leading to a perpetual transaction failure.
+
+            Detailed Vulnerability Description: The vulnerability in the original code lies in the function `doubleBaz()` within the `Bar` contract, which makes a call to `f.baz(0)`. The `baz()` function in the `Foo` contract contains a `require()` statement designed to validate that the input `x` must be greater than zero (`require(0 < x)`). However, the call from `doubleBaz()` passed a constant value of `0`, which fails this requirement, causing the transaction to revert every time it's called. This means the function is never able to execute successfully, leading to a requirement violation. It demonstrates improper input validation where the arguments to internal function calls do not satisfy the contract's own preconditions, rendering parts of the contract unusable or vulnerable to denial of service.
+
+###
+            Solution Description: The solution involved modifying the value passed to `f.baz()` in the `doubleBaz()` function call. Instead of passing `0`, the code was updated to pass a valid integer `1`, which satisfies the requirement defined in the `baz()` function (`require(0 < x)`). By ensuring that the input to the `baz()` function meets its operational preconditions, the vulnerability is eliminated. This alteration not only allows the function to operate correctly without reverting but also highlights the importance of ensuring that internal function calls respect the constraints enforced by `require()` statements to maintain contract integrity.
+

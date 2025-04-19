@@ -1,0 +1,91 @@
+vulnerable code:
+/*
+ * @source: https://github.com/trailofbits/not-so-smart-contracts/blob/master/wrong_constructor_name/incorrect_constructor.sol
+ * @author: Ben Perez
+ * Modified by Gerhard Wagner
+ */
+
+pragma solidity 0.4.24;
+
+contract Missing{
+ address private owner;
+
+ modifier onlyowner {
+ require(msg.sender==owner);
+ _;
+ }
+
+ function Constructor()
+ public
+ {
+ owner = msg.sender;
+ }
+
+ function () payable {}
+
+ function withdraw()
+ public
+ onlyowner
+ {
+ owner.transfer(this.balance);
+ }
+
+}
+
+
+Abstract purpose: The code snippet defines a contract that allows the owner to withdraw funds.
+
+Detail Behaviors:
+1. Define a private owner address.
+2. Implement a modifier onlyowner that requires the caller to be the owner.
+3. Define a constructor function to set the owner as the message sender.
+4. Implement a fallback function to receive payments.
+5. Implement a withdraw function that allows the owner to transfer the contract's balance.
+
+fixed code:
+/*
+ * @source: https://github.com/trailofbits/not-so-smart-contracts/blob/master/wrong_constructor_name/incorrect_constructor.sol
+ * @author: Ben Perez
+ * Modified by Gerhard Wagner
+ */
+
+pragma solidity ^0.4.24;
+
+contract Missing{
+ address private owner;
+
+ modifier onlyowner {
+ require(msg.sender==owner);
+ _;
+ }
+
+ constructor()
+ public
+ {
+ owner = msg.sender;
+ }
+
+ function () payable {}
+
+ function withdraw()
+ public
+ onlyowner
+ {
+ owner.transfer(this.balance);
+ }
+
+}
+
+
+Abstract Vulnerability Description: The vulnerability arises from an improper implementation of constructor functions in smart contracts, where failing to appropriately define the constructor allows functions intended to set privileged roles or initialize critical state variables to be executed as ordinary public functions. This can result in unauthorized access and manipulation of the contract's governance or asset control mechanisms.
+
+Trigger Action: Calling a function intended to be a constructor with an incorrect name, thereby allowing it to be invoked as a regular public function after deployment.
+
+            Detailed Vulnerability Description: "
+
+The code snippet suffers from a vulnerability classified as SWC-118: Incorrect Inheritance Order/Conflict. The specific issue at hand arises from the incorrect definition of the constructor in the contract. Prior to Solidity version 0.4.22, constructors were identified by giving a function the same name as the contract. However, if the function name does not match the contract name exactly, what was intended to be a constructor becomes an ordinary public function that can be called multiple times. This can lead to severe vulnerabilities, especially when the function is responsible for setting privileged roles or initializing critical state variables, such as the 'owner' in this contract. Here, the intended constructor is named `Constructor` instead of matching the contract name, `Missing`. As a result, the owner can be reassigned by any external user calling this public function, leading to unauthorized access and potential loss of control over the contract's assets or logic.
+
+"
+            Solution Description: "
+
+The solution to address this vulnerability involves ensuring that constructors are defined using the correct Solidity syntax, particularly when using versions 0.4.22 and above. In the corrected code, the function `Constructor()` is replaced with the keyword `constructor()`, which unequivocally denotes it as a constructor, making it uncallable post-deployment and not dependent on the function name matching the contract name. This modification effectively prevents any unauthorized changes to the `owner` of the contract after initialization, thereby securing the privileged actions that are typically defined within constructors. By adopting this syntax, developers ensure a more robust and less error-prone definition of constructors in their smart contracts.

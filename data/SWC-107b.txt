@@ -1,0 +1,96 @@
+vulnerable code:
+/*
+ * @source: http://blockchain.unica.it/projects/ethereum-survey/attacks.html#simpledao
+ * @author: Atzei N., Bartoletti M., Cimoli T
+ * Modified by Josselin Feist
+ */
+pragma solidity 0.4.24;
+
+contract SimpleDAO {
+ mapping (address => uint) public credit;
+
+ function donate(address to) payable public{
+ credit[to] += msg.value;
+ }
+
+ function withdraw(uint amount) public{
+ if (credit[msg.sender]>= amount) {
+ require(msg.sender.call.value(amount)());
+ credit[msg.sender]-=amount;
+ }
+ } 
+
+ function queryCredit(address to) view public returns(uint){
+ return credit[to];
+ }
+}
+
+
+Abstract purpose: The purpose of the code snippet is to implement a simple DAO (Decentralized Autonomous Organization) contract that allows users to donate, withdraw funds, and query their credit balance.
+
+Detail Behaviors:
+1. The contract allows users to donate Ether to another address.
+2. Users can withdraw funds from their credit balance, given they have enough balance.
+3. Users can query the credit balance of a specific address.
+
+fixed code:
+/*
+ * @source: http://blockchain.unica.it/projects/ethereum-survey/attacks.html#simpledao
+ * @author: Atzei N., Bartoletti M., Cimoli T
+ * Modified by Bernhard Mueller, Josselin Feist
+ */
+pragma solidity 0.4.24;
+
+contract SimpleDAO {
+ mapping (address => uint) public credit;
+
+ function donate(address to) payable public{
+ credit[to] += msg.value;
+ }
+
+ function withdraw(uint amount) public {
+ if (credit[msg.sender]>= amount) {
+ credit[msg.sender]-=amount;
+ require(msg.sender.call.value(amount)());
+ }
+ } 
+
+ function queryCredit(address to) view public returns (uint){
+ return credit[to];
+ }
+}
+
+
+Abstract Vulnerability Description: The identified vulnerability is a classic reentrancy flaw, which arises when a smart contract performs external interactions, such as transferring funds, before finalizing internal state updates. This sequence breach potentially allows an attacker to exploit and repeatedly invoke the vulnerable function, manipulating the contract's operations to drain its funds beyond intended amounts, thereby violating its expected behavior and financial security.
+
+Trigger Action: Initiation of the vulnerability occurs upon the execution of an external Ether transfer (`msg.sender.call.value(amount)()`) within the `withdraw` function, especially when the contract's internal state (specifically the `credit` balance tied to the caller's address) is not updated prior to such an external call, leaving the contract open to recursive exploitation.
+
+            Detailed Vulnerability Description: **
+
+The vulnerability lies within the `withdraw` function of the original contract. The issue manifests due to the call sequence:
+
+1. **Conditional Check:** The function checks if the `credit` associated with the `msg.sender` is greater than or equal to the requested `amount`.
+2. **External Call:** Using `msg.sender.call.value(amount)()`, the contract sends Ether to the caller without first updating the contract's internal state (i.e., the `credit` mapping).
+3. **State Update (Post External Call):** Only after the call does the contract update the `credit` by reducing the claimed `amount`.
+
+Because the state is not updated until after the external call, if the receiving contract is malicious, it can recursively call back into the `withdraw` function before the `credit[msg.sender]` is decremented. Each recursive call can keep withdrawing funds, leading to a depletion of the contract balance beyond what the original credit allowance should permit.
+
+**
+            Solution Description: **
+
+The modification in the `withdraw` function involves reordering the operations to prevent reentrancy:
+
+1. **State Update Before External Call:** The contract now updates `credit[msg.sender]-=amount;` before executing the external call (`msg.sender.call.value(amount)()`).
+
+By adjusting the sequence in this manner, the updated state ensures that even if a malicious contract attempts to recursively call `withdraw`, the condition `credit[msg.sender] >= amount` will fail after the initial decrement. This sequence effectively secures the contract against reentrancy attack by ensuring the balance is checked and updated before making external transfers, thus maintaining internal state integrity during all function executions.
+
+**Key Takeaways:**
+
+- **Behavior of Vulnerable Code:** Any smart contract function that updates state variables after making external calls can be susceptible to reentrancy attacks. Specifically, contracts failing to adjust balances before transferring funds may enable attackers to withdraw funds maliciously.
+
+- **General Solutions to Reentrancy Vulnerabilities:**
+  - **Pattern of Check-Effects-Interactions:** Follow this disciplined pattern in smart contract development to first check conditions, then update internal states, and finally interact with external addresses.
+  - **Avoid Low-Level Calls:** Prefer safer alternatives like `transfer` or `send` which have a fixed gas stipend and are less prone to reentrancy.
+  - **Use of Reentrancy Guards:** Utilize modifiers such as `nonReentrant` to protect susceptible functions from reentrant calls. 
+
+By implementing these preventive measures, smart contracts can uphold the security and robustness required to resist attacks of this nature.

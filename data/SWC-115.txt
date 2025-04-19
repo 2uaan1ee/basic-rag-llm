@@ -1,0 +1,78 @@
+vulnerable code:
+/*
+ * @source: https://consensys.github.io/smart-contract-best-practices/recommendations/#avoid-using-txorigin
+ * @author: Consensys Diligence  
+ * Modified by Gerhard Wagner
+ */
+
+pragma solidity 0.4.24;
+
+contract MyContract {
+
+ address owner;
+
+ function MyContract() public {
+ owner = msg.sender;
+ }
+
+ function sendTo(address receiver, uint amount) public {
+ require(tx.origin == owner);
+ receiver.transfer(amount);
+ }
+
+}
+
+
+Abstract purpose: Restricting the sending function in the smart contract to only the contract owner.  
+
+Detail Behaviors: 
+1. Assigns the contract creator as the owner upon contract deployment.
+2. Defines a function to send a specified amount to a receiver, but only if the transaction origin matches the contract owner.
+3. Utilizes the transfer method to send ether to the designated receiver.
+
+fixed code:
+/*
+ * @source: https://consensys.github.io/smart-contract-best-practices/recommendations/#avoid-using-txorigin
+ * @author: Consensys Diligence
+ * Modified by Gerhard Wagner
+ */
+
+pragma solidity 0.4.25;
+
+contract MyContract {
+
+ address owner;
+
+ function MyContract() public {
+ owner = msg.sender;
+ }
+
+ function sendTo(address receiver, uint amount) public {
+ require(msg.sender == owner);
+ receiver.transfer(amount);
+ }
+
+}
+
+
+Abstract Vulnerability Description: Improper use of transaction origin for authorization purposes can expose the contract to unauthorized access, allowing external entities to perform privileged operations by falsely verifying the legitimacy of the caller through the transaction's original sender.
+
+Trigger Action: The vulnerability is triggered when the contract authorizes actions based on `tx.origin`, allowing a malicious intermediary contract to manipulate the transaction flow and gain access by impersonating the original, legitimate user.
+
+            Detailed Vulnerability Description: **
+
+The use of `tx.origin` allows a malicious contract to manipulate a transaction's original sender. In a scenario where an authorized user interacts with a malicious contract that then forwards the call to the vulnerable contract, the authorization check using `tx.origin` would mistakenly recognize the original sender, the authorized user, as the initiator of the transaction. Here are the steps that lead to this vulnerability:
+
+1. A legitimate user, deemed as an owner or authorized party, interacts with an external malignant contract.
+2. This malignant contract performs a call to the vulnerable contract.
+3. The vulnerable contract's logic checks `tx.origin` to authorize actions, wrongly identifying the involved party.
+4. As a result, a transfer or privileged operation is executed, compromising the owner’s funds or functionalities inadvertently.
+
+**
+            Solution Description: **
+
+The best practice to eliminate this vulnerability is to utilize `msg.sender` instead of `tx.origin` for authorizing users within the contract. Unlike `tx.origin`, which traces back to the original exterior source of the transaction, `msg.sender` strictly refers to the direct caller of the function. This adjustment ensures that authorization checks are appropriately confined to calls made directly by the expected actors. Here's the corrective approach in detail:
+
+1. Replace all instances of `tx.origin` with `msg.sender` to ensure the contract's function is assessing the immediate caller, necessitating that only verified or intended accounts can exercise control.
+2. Subsequently, the logic now securely enforces that operations such as token transfers or sensitive actions are limited to being directly invoked by the owner or an authorized proxy, avoiding indirect privilege escalations via intermediaries.
+

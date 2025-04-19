@@ -1,0 +1,74 @@
+vulnerable code:
+/*
+ * @author: Kaden Zipfel
+ */
+
+pragma solidity ^0.5.0;
+
+contract Wallet {
+ mapping(address => uint) balance;
+
+ 
+ function deposit(uint amount) public payable {
+ require(msg.value == amount, 'msg.value must be equal to amount');
+ balance[msg.sender] = amount;
+ }
+
+ 
+ function withdraw(uint amount) public {
+ require(amount <= balance[msg.sender], 'amount must be less than balance');
+
+ uint previousBalance = balance[msg.sender];
+ balance[msg.sender] = previousBalance - amount;
+
+ 
+ msg.sender.call.value(amount);
+ }
+}
+
+
+Abstract purpose:
+This code snippet represents a smart contract called Wallet that allows users to deposit and withdraw funds.
+
+Detail Behaviors:
+1. Users can deposit funds into their wallet by calling the deposit function and sending the specified amount.
+2. Users can withdraw funds from their wallet by calling the withdraw function with the desired amount.
+
+fixed code:
+/*
+ * @author: Kaden Zipfel
+ */
+
+pragma solidity ^0.5.0;
+
+contract Wallet {
+ mapping(address => uint) balance;
+
+ 
+ function deposit(uint amount) public payable {
+ require(msg.value == amount, 'msg.value must be equal to amount');
+ balance[msg.sender] = amount;
+ }
+
+ 
+ function withdraw(uint amount) public {
+ require(amount <= balance[msg.sender], 'amount must be less than balance');
+
+ uint previousBalance = balance[msg.sender];
+ balance[msg.sender] = previousBalance - amount;
+
+ 
+ (bool success, ) = msg.sender.call.value(amount)("");
+ require(success, 'transfer failed');
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability arises from the use of a low-level external function call without verifying the outcome of the call, allowing for incorrect execution flow if the call fails. This unchecked call return vulnerability can lead to logic errors or potential exploits by treating a failed transaction as successful.
+
+Trigger Action: Executing an external function call using low-level methods without subsequently verifying the success state of the transaction's execution.
+
+            Detailed Vulnerability Description: The vulnerability in the original code snippet arises from the fact that it uses the `call` method without checking the result. This is a specific instance of the "Unchecked Call Return Value" vulnerability (SWC-135), which is common in Ethereum smart contract development. The problem with using `msg.sender.call.value(amount)` is that it returns a boolean indicating success or failure of the transaction, but in the initial version of the code, this return value was ignored. An attacker could exploit this oversight to prevent the function from halting and incorrectly execute further code as if the transaction had succeeded, potentially facilitating scenarios leading to unexpected outcomes such as re-entrancy attacks (although in this scenario, re-entrancy is not directly applicable due to the absence of reentrant balances logic changes post-transfer).
+
+###
+            Solution Description: The modification to the smart contract introduced the proper handling of the `call` method's return value, which is a critical fix. By capturing this return value in a boolean variable `success`, the modified code now checks if the transfer operation itself was successful. The line `(bool success, ) = msg.sender.call.value(amount)("")` captures the success state of the call, and the subsequent `require(success, 'transfer failed')` ensures that further execution of the function halts if the transfer did not complete successfully. This not only halts execution upon failure but also provides feedback to users about the nature of the failure ("transfer failed"), thereby eliminating the potential for silent failures that could impact the security and reliability of the smart contract. This specific fix is a classic solution to mitigate the risks associated with unchecked low-level call return values in Solidity.

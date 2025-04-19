@@ -1,0 +1,246 @@
+vulnerable code:
+pragma solidity ^0.4.24;
+
+/** Taken from the OpenZeppelin github
+ * @title SafeMath
+ * @dev Math operations with safety checks that revert on error
+ */
+library SafeMath {
+
+ /**
+  * @dev Multiplies two numbers, reverts on overflow.
+  */
+ function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+ 
+ 
+ 
+ if (a == 0) {
+ return 0;
+ }
+
+ uint256 c = a * b;
+ require(c / a == b);
+
+ return c;
+ }
+
+ /**
+  * @dev Integer division of two numbers truncating the quotient, reverts on division by zero.
+  */
+ function div(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b > 0); 
+ uint256 c = a / b;
+ 
+
+ return c;
+ }
+
+ /**
+  * @dev Subtracts two numbers, reverts on overflow (i.e. if subtrahend is greater than minuend).
+  */
+ function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b <= a);
+ uint256 c = a - b;
+
+ return c;
+ }
+
+ /**
+  * @dev Adds two numbers, reverts on overflow.
+  */
+ function add(uint256 a, uint256 b) internal pure returns (uint256) {
+ uint256 c = a + b;
+ require(c >= a);
+
+ return c;
+ }
+
+ /**
+  * @dev Divides two numbers and returns the remainder (unsigned integer modulo),
+  * reverts when dividing by zero.
+  */
+ function mod(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b != 0);
+ return a % b;
+ }
+}
+
+
+contract ERC20 {
+
+ event Transfer( address indexed from, address indexed to, uint256 value );
+ event Approval( address indexed owner, address indexed spender, uint256 value);
+ using SafeMath for *;
+
+ mapping (address => uint256) private _balances;
+
+ mapping (address => mapping (address => uint256)) private _allowed;
+
+ uint256 private _totalSupply;
+
+ constructor(uint totalSupply){
+ _balances[msg.sender] = totalSupply;
+ }
+
+ function balanceOf(address owner) public view returns (uint256) {
+ return _balances[owner];
+ }
+
+
+ function allowance(address owner, address spender) public view returns (uint256)
+ {
+ return _allowed[owner][spender];
+ }
+
+ function transfer(address to, uint256 value) public returns (bool) {
+ require(value <= _balances[msg.sender]);
+ require(to != address(0));
+
+ _balances[msg.sender] = _balances[msg.sender].sub(value);
+ _balances[to] = _balances[to].add(value);
+ emit Transfer(msg.sender, to, value);
+ return true;
+ }
+
+ function approve(address spender, uint256 value) public returns (bool) {
+ require(spender != address(0));
+
+ _allowed[msg.sender][spender] = value;
+ emit Approval(msg.sender, spender, value);
+ return true;
+ }
+
+ function transferFrom(address from, address to, uint256 value) public returns (bool) {
+ require(value <= _balances[from]);
+ require(value <= _allowed[from][msg.sender]);
+ require(to != address(0));
+
+ _balances[from] = _balances[from].sub(value);
+ _balances[to] = _balances[to].add(value);
+ _allowed[from][msg.sender] = _allowed[from][msg.sender].sub(value);
+ emit Transfer(from, to, value);
+ return true;
+ }
+}
+
+
+Abstract purpose: Implementing SafeMath functions and ERC20 token functionalities in a smart contract.
+
+Detail Behaviors: 
+1. Implement SafeMath library with functions for multiplication, division, subtraction, addition, and modulo operations.
+2. Define ERC20 contract with functions for transferring tokens, checking balances, approving token transfers, and executing transfers between addresses with allowance checks.
+
+fixed code:
+pragma solidity ^0.4.24;
+
+library SafeMath {
+    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+        if (a == 0) {
+            return 0;
+        }
+        uint256 c = a * b;
+        require(c / a == b);
+        return c;
+    }
+
+    function div(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b > 0);
+        uint256 c = a / b;
+        return c;
+    }
+
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b <= a);
+        return a - b;
+    }
+
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a + b;
+        require(c >= a);
+        return c;
+    }
+
+    function mod(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b != 0);
+        return a % b;
+    }
+}
+
+contract ERC20 {
+    using SafeMath for uint256;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+
+    mapping(address => uint256) private _balances;
+    mapping(address => mapping(address => uint256)) private _allowed;
+
+    uint256 private _totalSupply;
+
+    constructor(uint256 totalSupply) public {
+        _balances[msg.sender] = totalSupply;
+        _totalSupply = totalSupply;
+    }
+
+    function balanceOf(address owner) public view returns (uint256) {
+        return _balances[owner];
+    }
+
+    function allowance(address owner, address spender) public view returns (uint256) {
+        return _allowed[owner][spender];
+    }
+
+    function transfer(address to, uint256 value) public returns (bool) {
+        require(value <= _balances[msg.sender]);
+        require(to != address(0));
+
+        _balances[msg.sender] = _balances[msg.sender].sub(value);
+        _balances[to] = _balances[to].add(value);
+        emit Transfer(msg.sender, to, value);
+        return true;
+    }
+
+    function approve(address spender, uint256 value) public returns (bool) {
+        require(spender != address(0));
+
+        // Mitigate race condition by requiring allowance to be set to 0 before updating
+        require(_allowed[msg.sender][spender] == 0, "Allowance must be reset to 0 before updating");
+        _allowed[msg.sender][spender] = value;
+        emit Approval(msg.sender, spender, value);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 value) public returns (bool) {
+        require(value <= _balances[from]);
+        require(value <= _allowed[from][msg.sender]);
+        require(to != address(0));
+
+        _balances[from] = _balances[from].sub(value);
+        _balances[to] = _balances[to].add(value);
+        _allowed[from][msg.sender] = _allowed[from][msg.sender].sub(value);
+        emit Transfer(from, to, value);
+        return true;
+    }
+}
+
+
+Abstract Vulnerability Description: **Transaction Order Dependence (TOD) / Front Running in Approval Mechanism**: This vulnerability involves a time-sensitive race condition, where an attacker observes a user's intent to change a token spending allowance and successfully executes a token transfer with the existing allowance before the intended update occurs. This can result in unauthorized token transfers, exploiting the sequence of transactions due to variable network transaction processing speeds.
+
+Trigger Action: **Race Condition Exploited Through Front-Running Transactions**: The vulnerability is triggered when an attacker observes a user's transaction to update spending allowance and submits a competing transaction with a higher gas fee to prioritize its execution, resulting before the allowance update, allowing an unauthorized token transfer.
+
+            Detailed Vulnerability Description: The vulnerability described in the original ERC20 contract pertains to a race condition in the context of the `approve` function. This vulnerability typically arises in blockchain systems like Ethereum due to the nature of transaction processing, where miners select transactions based on gas prices, potentially allowing one transaction to precede another. 
+
+**Specific Case:**
+1. **Condition:** Alice approves Eve to spend `n` tokens on her behalf using the `approve` function. 
+2. **Attack Vector:** Before Alice can update this allowance to `m` tokens, Eve observes this attempt (by running an Ethereum node) and preempts the update. Eve submits a `transferFrom` transaction with a higher gas fee, transferring `n` tokens to herself. This transaction gets prioritized and executed before Alice's `approve` transaction due to the higher gas price.
+3. **Consequence:** Once Eve's transfer transaction executes, the approval allowance drops to 0 (since all allowed tokens were used). However, when Alice’s transaction to change the approval to `m` occurs, the allowance for Eve resets to `m`. This means Eve successfully obtains a total of `n + m` tokens.
+
+###
+            Solution Description: The primary approach to mitigating this race condition exploits the need to set the allowance explicitly to zero before changing it. The strategy addresses the problem by enforcing a reset step:
+
+1. **Modification in `approve` Function:**
+   - The smart contract requires the approval allowance to be set to zero before updating it to a new value. This implementation counters the potential for a race condition. Before any new approval is made, the current approval (`_allowed[msg.sender][spender]`) must first be zeroed.
+
+2. **Rationale:**
+   - This solution prevents any pending or competing transactions from having an influence on the state change, as it enforces a complete reset of the approval to zero.
+   - Thus, Eve cannot exploit a higher gas fee to prioritize an unauthorized `transferFrom` before the state updates by Alice.

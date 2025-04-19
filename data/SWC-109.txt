@@ -1,0 +1,155 @@
+vulnerable code:
+/*
+ * @source: https://github.com/thec00n/smart-contract-honeypots/blob/master/CryptoRoulette.sol
+ */
+pragma solidity ^0.4.19;
+
+
+
+
+
+
+
+
+contract CryptoRoulette {
+
+ uint256 private secretNumber;
+ uint256 public lastPlayed;
+ uint256 public betPrice = 0.1 ether;
+ address public ownerAddr;
+
+ struct Game {
+ address player;
+ uint256 number;
+ }
+ Game[] public gamesPlayed;
+
+ function CryptoRoulette() public {
+ ownerAddr = msg.sender;
+ shuffle();
+ }
+
+ function shuffle() internal {
+ 
+ secretNumber = uint8(sha3(now, block.blockhash(block.number-1))) % 20 + 1;
+ }
+
+ function play(uint256 number) payable public {
+ require(msg.value >= betPrice && number <= 10);
+
+ Game game;
+ game.player = msg.sender;
+ game.number = number;
+ gamesPlayed.push(game);
+
+ if (number == secretNumber) {
+ 
+ msg.sender.transfer(this.balance);
+ }
+
+ shuffle();
+ lastPlayed = now;
+ }
+
+ function kill() public {
+ if (msg.sender == ownerAddr && now > lastPlayed + 1 days) {
+ suicide(msg.sender);
+ }
+ }
+
+ function() public payable { }
+}
+
+
+Abstract purpose: Implementing a CryptoRoulette game with a secret number and betting functionality.
+
+Detail Behaviors: 
+1. Initialize and shuffle the secret number with a range of 1 to 20.
+2. Allow players to place bets with a specific number and minimum bet price.
+3. Record played games and results in a structured manner.
+4. Transfer funds to the player upon correct guess of the secret number.
+5. Enable the owner to terminate the contract if certain conditions are met.
+
+fixed code:
+/*
+ * @source: https://github.com/thec00n/smart-contract-honeypots/blob/master/CryptoRoulette.sol
+ */
+pragma solidity ^0.4.19;
+
+
+
+
+
+
+
+
+contract CryptoRoulette {
+
+ uint256 private secretNumber;
+ uint256 public lastPlayed;
+ uint256 public betPrice = 0.1 ether;
+ address public ownerAddr;
+
+ struct Game {
+ address player;
+ uint256 number;
+ }
+ Game[] public gamesPlayed;
+
+ function CryptoRoulette() public {
+ ownerAddr = msg.sender;
+ shuffle();
+ }
+
+ function shuffle() internal {
+ 
+ secretNumber = uint8(sha3(now, block.blockhash(block.number-1))) % 20 + 1;
+ }
+
+ function play(uint256 number) payable public {
+ require(msg.value >= betPrice && number <= 10);
+
+ Game memory game;
+ game.player = msg.sender;
+ game.number = number;
+ gamesPlayed.push(game);
+
+ if (number == secretNumber) {
+ 
+ msg.sender.transfer(this.balance);
+ }
+
+ shuffle();
+ lastPlayed = now;
+ }
+
+ function kill() public {
+ if (msg.sender == ownerAddr && now > lastPlayed + 1 days) {
+ suicide(msg.sender);
+ }
+ }
+
+ function() public payable { }
+}
+
+
+Abstract Vulnerability Description: The smart contract is vulnerable to unintended state alterations due to the use of uninitialized storage variables. This occurs when data structures within a function default to storage without explicit memory allocation, inadvertently causing them to interact with unintended storage slots, leading to unpredictable contract behavior.
+
+Trigger Action: Declaring a data structure within a function without specifying its memory location, allowing it to default to a storage reference and potentially overwrite existing storage regions.
+
+            Detailed Vulnerability Description: The original code demonstrated a vulnerability by using an uninitialized storage variable. In Solidity, when you define a struct and declare a variable of that struct type inside a function without specifying whether it should reside in memory, it defaults to the storage type. This default behavior can be a security risk because an uninitialized storage variable can inadvertently point to, and overwrite, an existing storage slot within the contract, modifying contract state unexpectedly.
+
+In the provided code, the `Game` struct instance:
+```solidity
+Game game;
+```
+is not explicitly declared as a memory type, causing it to accidentally default to a storage reference. This behavior risks overwriting existing storage space, as `game` could be mistakenly using storage pointers referring to unexpected storage locations.
+
+###
+            Solution Description: To rectify this vulnerability, the declaration of the `Game` struct in the `play` function was amended to explicitly specify it as a `memory` variable:
+```solidity
+Game memory game;
+```
+
+This explicit declaration ensures the struct instance is allocated in memory, existing only temporarily during function execution and effectively preventing accidental overwriting of crucial storage space. Memory variables do not persist beyond the function execution, thereby eliminating the risk associated with unintentional storage manipulation.
+

@@ -1,0 +1,90 @@
+vulnerable code:
+pragma solidity ^0.4.25;
+
+contract DosOneFunc {
+
+ address[] listAddresses;
+
+ function ifillArray() public returns (bool){
+ if(listAddresses.length<1500) {
+
+ for(uint i=0;i<350;i++) {
+ listAddresses.push(msg.sender);
+ }
+ return true;
+
+ } else {
+ listAddresses = new address[](0);
+ return false;
+ }
+ }
+}
+
+
+Abstract purpose:
+The purpose of the code snippet is to fill an array with the sender's address in batches, up to a maximum of 1500 elements, and reset the array if it reaches that limit.
+
+Detail Behaviors: 
+1. Check if the array length is less than 1500.
+2. If less than 1500, add the sender's address to the array in batches of 350.
+3. Return true after filling the array.
+4. If the array length reaches 1500, reset the array to an empty array.
+5. Return false after resetting the array.
+
+fixed code:
+pragma solidity ^0.4.25;
+
+contract DosOneFunc {
+    address[] listAddresses;
+    uint public maxBatchSize = 50; // Limit batch processing
+
+    function fillArray(uint batchSize) public returns (bool) {
+        require(batchSize > 0 && batchSize <= maxBatchSize, "Invalid batch size");
+
+        if (listAddresses.length < 1500) {
+            for (uint i = 0; i < batchSize; i++) {
+                listAddresses.push(msg.sender);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    function clearBatch(uint batchSize) public {
+        require(batchSize > 0 && batchSize <= maxBatchSize, "Invalid batch size");
+        require(listAddresses.length > 0, "Array is already empty");
+
+        uint deleteCount = batchSize > listAddresses.length ? listAddresses.length : batchSize;
+        for (uint i = 0; i < deleteCount; i++) {
+            listAddresses[listAddresses.length - 1] = address(0);
+            listAddresses.length--;
+        }
+    }
+
+    function getListSize() public view returns (uint) {
+        return listAddresses.length;
+    }
+}
+
+
+Abstract Vulnerability Description: The vulnerability presents as a Denial of Service (DoS) condition arising from exceeding the computational resource constraints imposed by the blockchain, specifically due to unchecked growth of data structures within the contract. This occurs when a function attempts to perform operations that require more gas than the maximum allowed by the network for a single transaction, potentially locking out future interactions with the contract.
+
+Trigger Action: Initiating the function that adds multiple entries to a data structure beyond a network block's gas capacity, risking transaction failure and preventing the function from executing successfully as the data structure approaches its upper gas threshold.
+
+            Detailed Vulnerability Description: 1. **Vulnerability Type**: SWC-128 - DoS with Block Gas Limit.
+
+2. **Root Cause**: The function `ifillArray`, as originally written, attempts to add a large number of elements (350 times the caller’s address) to an array `listAddresses` in a single transaction. As the size of the array increases, so does the gas cost associated with each additional transaction that modifies the array. Consequently, if the gas required to process a transaction exceeds the network's block gas limit, the transaction will fail, thereby effectively causing a DoS attack on the function itself.
+
+3. **Manifestation**: Over time, as the array grows close to its threshold of 1500 addresses, transactions calling `ifillArray` become susceptible to exceeding the block gas limit. This inadvertently blocks further interaction with the function as the operation cannot be completed within a reasonable gas amount.
+
+4. **Potential Impact**: The inability to call `ifillArray` or the contract getting stuck if this function is part of a broader critical operational logic within a decentralized application (dApp).
+
+###
+            Solution Description: 1. **Reduction of Batch Size**: The critical modification involved controlling the number of iterations in the loop that appends addresses to the `listAddresses` array. By introducing a `batchSize` parameter and limiting it through a moderate `maxBatchSize`, the computation per transaction is confined to a manageable number, ensuring that the cost of gas operations remains within the block gas limit.
+
+2. **Function to Clear the Array**: A separate method, `clearBatch`, was introduced. This function also respects the `maxBatchSize` limit and iteratively clears a defined number of entries from the end of the array. This provides a controlled way to manage and reduce the array size without consuming excessive gas.
+
+3. **Use of Require Statements**: The solution incorporates `require` statements to enforce constraints on the `batchSize` parameter. This validation step is crucial for ensuring that the contract's users provide permissible values for batch operations, minimizing the risk of erroneous or exploitative input.
+
+4. **Improved Gas Usage**: By effectively slicing operations into smaller, more predictable units, the solution promotes economic gas usage and prevents potential DoS scenarios by keeping executions within acceptable gas limits.
+

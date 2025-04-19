@@ -1,0 +1,85 @@
+vulnerable code:
+/*
+ * @source: https://github.com/sigp/solidity-security-blog#visibility
+ * @author: SigmaPrime
+ * Modified by Gerhard Wagner
+ */
+
+pragma solidity ^0.4.24;
+
+contract HashForEther {
+
+ function withdrawWinnings() {
+ 
+ require(uint32(msg.sender) == 0);
+ _sendWinnings();
+ }
+
+ function _sendWinnings() {
+ msg.sender.transfer(this.balance);
+ }
+}
+
+
+Abstract purpose: The code snippet demonstrates a simple contract to withdraw winnings stored in the contract balance.
+
+Detail Behaviors: 
+1. Require that the sender is a specific address.
+2. Transfer the contract balance to the sender.
+
+fixed code:
+/*
+ * @source: https://github.com/sigp/solidity-security-blog#visibility
+ * @author: SigmaPrime
+ * Modified by Gerhard Wagner
+ */
+
+pragma solidity ^0.4.24;
+
+contract HashForEther {
+
+ function withdrawWinnings() public {
+ 
+ require(uint32(msg.sender) == 0);
+ _sendWinnings();
+ }
+
+ function _sendWinnings() internal{
+ msg.sender.transfer(this.balance);
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability arises from the inadequate specification of function visibility, which leads to unintended public accessibility in pre-0.5.0 Solidity versions. This oversight potentially allows for unauthorized external interactions, leading to unforeseen and insecure invocation of critical contract functions such as those responsible for asset transfers.
+
+Trigger Action: The trigger action is the lack of explicit visibility modifiers on the `withdrawWinnings` function, defaulting it to public visibility and thus allowing any external entity to invoke it without restriction.
+
+            Detailed Vulnerability Description: The vulnerability identified in the original code stems from the implicit nature of function visibility in Solidity, specifically versions prior to 0.5.0. In these versions, if a function does not have an explicitly defined visibility modifier, it defaults to `public`. This behavior can inadvertently expose functions to external calls that were intended to be restricted, leading to unauthorized access. In the provided code snippet:
+
+1. **Function Visibility Issue**: The `withdrawWinnings` function lacks an explicit visibility setting, making it `public` by default. This allows anyone to call this function externally, potentially executing the `_sendWinnings()` function.
+
+2. **Risk of Unauthorized Access**: The code leverages a peculiar property where `uint32(msg.sender)` equals `0`. While this might work as a temporary safeguard by constraining withdrawals, it still represents an ambiguous security model where possession of such an address would lead to catastrophic loss of all Ether held by the contract to untrusted actors.
+
+3. **Unintended Transfer Invocation**: The absence of intended access restrictions on potentially destructive actions, such as transferring the contract's balance with `msg.sender.transfer(this.balance)`, highlights the criticality of correctly defining access scopes.
+
+###
+            Solution Description: ### Detailed Vulnerability Description:
+
+The vulnerability identified in the original code stems from the implicit nature of function visibility in Solidity, specifically versions prior to 0.5.0. In these versions, if a function does not have an explicitly defined visibility modifier, it defaults to `public`. This behavior can inadvertently expose functions to external calls that were intended to be restricted, leading to unauthorized access. In the provided code snippet:
+
+1. **Function Visibility Issue**: The `withdrawWinnings` function lacks an explicit visibility setting, making it `public` by default. This allows anyone to call this function externally, potentially executing the `_sendWinnings()` function.
+
+2. **Risk of Unauthorized Access**: The code leverages a peculiar property where `uint32(msg.sender)` equals `0`. While this might work as a temporary safeguard by constraining withdrawals, it still represents an ambiguous security model where possession of such an address would lead to catastrophic loss of all Ether held by the contract to untrusted actors.
+
+3. **Unintended Transfer Invocation**: The absence of intended access restrictions on potentially destructive actions, such as transferring the contract's balance with `msg.sender.transfer(this.balance)`, highlights the criticality of correctly defining access scopes.
+
+### Solution Description:
+
+The modification of the code resolves the visibility issue, enhancing its security posture:
+
+1. **Explicit Function Visibility**: The `withdrawWinnings` function is explicitly marked as `public`, affirming the contract maintainer's intention for it to be externally callable. While this may seem cosmetic in this instance, defining this purposefully discourages unintended default behavior and helps preclude developer oversight.
+
+2. **Restrict Internal Calls**: The `_sendWinnings` function’s visibility is changed to `internal`. This modification ensures that `_sendWinnings` cannot be invoked by any external entities or contracts, apart from its own contract functions. This controlled encapsulation mitigates unauthorized balance transfers.
+
+3. **Precise Security Model**: The explicit definition of visibility modifiers across functions dictates clear access policies, building a robust security model by ensuring functions perform only as intended. Developing an adequate logic layer is crucial in complex financial systems.
+

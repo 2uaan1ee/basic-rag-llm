@@ -1,0 +1,122 @@
+vulnerable code:
+/*
+ * @source: https://youtu.be/P_Mtd5Fc_3E
+ * @author: Shahar Zini
+ */
+pragma solidity ^0.5.0;
+
+contract GuessTheNumber
+{
+    uint _secretNumber;
+    address payable _owner;
+    event success(string);
+    event wrongNumber(string);
+
+    constructor(uint secretNumber) payable public
+    {
+        require(secretNumber <= 10);
+        _secretNumber = secretNumber;
+        _owner = msg.sender;
+    }
+
+    function getValue() view public returns (uint)
+    {
+        return address(this).balance;
+    }
+
+    function guess(uint n) payable public
+    {
+        require(msg.value == 1 ether);
+
+        uint p = address(this).balance;
+        checkAndTransferPrize(/*The prize‮/*rebmun desseug*/n , p/*‭
+                /*The user who should benefit */,msg.sender);
+    }
+
+    function checkAndTransferPrize(uint p, uint n, address payable guesser) internal returns(bool)
+    {
+        if(n == _secretNumber)
+        {
+            guesser.transfer(p);
+            emit success("You guessed the correct number!");
+        }
+        else
+        {
+            emit wrongNumber("You've made an incorrect guess!");
+        }
+    }
+
+    function kill() public
+    {
+        require(msg.sender == _owner);
+        selfdestruct(_owner);
+    }
+}
+
+Abstract purpose: Implementing a smart contract for a game where users guess a secret number to potentially win a prize.
+
+Detail Behaviors: 1. Constructor sets the secret number and owner address. 2. getValue function returns the contract's balance. 3. guess function checks if the guessed number matches the secret number and transfers the prize. 4. checkAndTransferPrize function determines if the guess is correct and transfers the prize accordingly. 5. kill function allows the contract owner to destruct the contract.
+
+fixed code:
+pragma solidity ^0.5.0;
+
+contract GuessTheNumber {
+    uint private _secretNumber;
+    address payable private _owner;
+    
+    event Success(string);
+    event WrongNumber(string);
+
+    constructor(uint secretNumber) payable public {
+        require(secretNumber <= 10, "Secret number must be between 0 and 10");
+        _secretNumber = secretNumber;
+        _owner = msg.sender;
+    }
+
+    function getValue() public view returns (uint) {
+        return address(this).balance;
+    }
+
+    function guess(uint n) public payable {
+        require(msg.value == 1 ether, "You must send exactly 1 ether");
+
+        uint prize = address(this).balance;
+        checkAndTransferPrize(n, prize, msg.sender);
+    }
+
+    function checkAndTransferPrize(uint n, uint prize, address payable guesser) internal {
+        if (n == _secretNumber) {
+            guesser.transfer(prize);
+            emit Success("You guessed the correct number!");
+        } else {
+            emit WrongNumber("You've made an incorrect guess!");
+        }
+    }
+
+    function kill() public {
+        require(msg.sender == _owner, "Only the owner can self-destruct the contract");
+        selfdestruct(_owner);
+    }
+}
+
+Abstract Vulnerability Description: The vulnerability involves deceptive text manipulation within the smart contract due to misuse of special unicode characters, which can intentionally alter the visual presentation of code, leading to misunderstandings about the contract's logic and intent. This text manipulation can disguise malicious actions, impair code auditing, and mislead users and developers.
+
+Trigger Action: Embedding Right-To-Left-Override (RTLO) unicode characters within the smart contract code or comments, thereby resulting in the reversal of text display order in text editors or viewers, which can manipulate the perceived logic of the contract.
+
+
+            Detailed Vulnerability Description: 1. **RTLO Character Misuse**: 
+   The original code contained a segment wherein an RTLO unicode character was embedded in comments. This can cause text editors and viewers to reverse the display order of text, potentially misleading developers or users who read the code. The naming of variables or comments can be manipulated to show different names or meanings, hiding malicious intent.
+
+2. **Confusing Representation**: 
+   The utilization of RTLO can confuse the representation of elements within the code, making it challenging to review and audit for vulnerabilities. Attackers could leverage this to conceal malicious actions or harmful logic by reversing critical parts of statements in comments or compile-time conditions that mislead a potential auditor or a user.
+
+###
+            Solution Description: 1. **Remove RTLO Characters**: 
+   The updated code eliminates any usage of RTLO characters, ensuring that the user interface, comments, and function names are represented correctly and are clearly legible without any misleading interpretations. This also ensures that the functionality of the contract is transparent, preventing deception through altered text direction.
+
+2. **Code Refactoring**: 
+   The refactored code also includes enhanced error messages in the `require` statements, promoting better transparency and understanding for end-users and developers. This change ensures that code logic and failure reasons are explicit, reducing confusion and aiding in debugging.
+
+3. **Variable Scope and Naming Enhancements**:
+   The modified code correctly scopes variables as `private`, improving the contract's encapsulation thus avoiding unintended external manipulability. Additionally, the naming convention for events has been updated to match standard Solidity practices, thereby simplifying the reading and maintaining process by adhering to community-honored coding standards.
+

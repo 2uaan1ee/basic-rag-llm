@@ -1,0 +1,88 @@
+vulnerable code:
+/*
+ * @source: TrailofBits workshop at TruffleCon 2018
+ * @author: Josselin Feist (adapted for SWC by Bernhard Mueller)
+ * Assert violation with 3 message calls:
+ * - airdrop()
+ * - backdoor()
+ * - test_invariants()
+ */
+pragma solidity ^0.4.22;
+
+contract Token{
+
+ mapping(address => uint) public balances;
+ function airdrop() public{
+ balances[msg.sender] = 1000;
+ }
+
+ function consume() public{
+ require(balances[msg.sender]>0);
+ balances[msg.sender] -= 1;
+ }
+
+ function backdoor() public{
+ balances[msg.sender] += 1;
+ }
+
+ function test_invariants() {
+ assert(balances[msg.sender] <= 1000);
+ }
+}
+
+
+Abstract purpose: Demonstrating security vulnerabilities through intentional code flaws.
+
+Detail Behaviors: 
+1. The airdrop function sets the balance of the caller to 1000 tokens.
+2. The consume function deducts 1 token from the caller's balance.
+3. The backdoor function adds 1 token to the caller's balance.
+4. The test_invariants function asserts that the caller's balance is less than or equal to 1000 tokens.
+
+fixed code:
+/*
+ * @source: TrailofBits workshop at TruffleCon 2018
+ * @author: Josselin Feist (adapted for SWC by Bernhard Mueller)
+ */
+pragma solidity ^0.4.22;
+
+contract Token {
+
+ mapping(address => uint) public balances;
+ 
+ function airdrop() public {
+ balances[msg.sender] = 1000;
+ }
+
+ function consume() public {
+ require(balances[msg.sender] > 0);
+ balances[msg.sender] -= 1;
+ }
+
+ function backdoor() public {
+ balances[msg.sender] += 1;
+ }
+
+ function test_invariants() public {
+ require(balances[msg.sender] <= 1000, "Invariant violated");
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability arises from the misuse of an invariant verification mechanism within a smart contract, where the logic of enforcing a critical constraint is insufficiently protected, leading to potential bypassing or exploitation. The misapplication of an invariant check designed for internal sanity conditions is manipulated by exposing certain functions (e.g., backdoor-like capabilities) that allow external actors to infringe upon those constraints without triggering a critical failure, undermining the contractual logic and security posture.
+
+Trigger Action: Invocation of an unrestricted or inadequately protected function that enables an actor to alter contract state variables, violating the established logical constraints without triggering the appropriate failure mechanism.
+
+            Detailed Vulnerability Description: 1. **Usage of assert():** In the original `test_invariants()` function, the `assert()` function was used to ensure that the balance of the `msg.sender` does not exceed 1000. However, this asserts an invariant that can be influenced by any user due to the `backdoor()` function, which allows users to arbitrarily increment their balances.
+
+2. **Violation of Contract Logic:** The presence of the `backdoor()` function enables users to bypass the intended restriction of 1000 set by `airdrop()`. This undermines the invariant ensured by `assert()`, leading to situations where the contract logic is breached without triggering a hard failure through the assertion.
+
+3. **Lack of Public Annotation:** The function `test_invariants()` was not marked as `public` in the original contract, which makes it less noticeable in the contract interface, potentially decreasing clarity on its intended function.
+
+###
+            Solution Description: 1. **Substitution with require():** The modified code replaces the `assert()` with `require()`. The `require()` function is more appropriate for user-facing validations that can fail under predictable circumstances, such as user input errors or when the state changes externally by an expected contract function. The use of `require()` ensures a graceful failure while providing an informative error message "Invariant violated".
+
+2. **Modification of the backdoor():** While the original vulnerability description and fix do not explicitly mention modifications to the `backdoor()` function, a complete mitigation strategy would involve either removing this function or adding additional logic to prevent misuse, such as permission checks or setting a call limit. Ensure this function cannot inadvertently be used to break the intended contract invariants.
+
+3. **Public Visibility and Error Messaging:** The `test_invariants()` function was made `public`, which can enhance clarity. The addition of an error message within the `require()` function aids in understanding what went wrong when the invariant is breached, simplifying debugging and enhancing usability.
+

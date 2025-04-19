@@ -1,0 +1,90 @@
+vulnerable code:
+/*
+ * @source: https://github.com/ConsenSys/evm-analyzer-benchmark-suite
+ * @author: Suhabe Bugrara
+ */
+
+
+
+
+pragma solidity ^0.4.23;
+
+contract IntegerOverflowMultiTxMultiFuncFeasible {
+ uint256 private initialized = 0;
+ uint256 public count = 1;
+
+ function init() public {
+ initialized = 1;
+ }
+
+ function run(uint256 input) {
+ if (initialized == 0) {
+ return;
+ }
+
+ count -= input;
+ }
+}
+
+
+Abstract purpose: This smart contract demonstrates multiple transactions and functions with integer overflow susceptibility. 
+
+Detail Behaviors: 
+1. Initialization of the contract sets initialized to 0 and count to 1.
+2. The "init" function sets initialized to 1.
+3. The "run" function subtracts the input from count if the contract has been initialized.
+
+fixed code:
+/*
+ * @source: https://github.com/ConsenSys/evm-analyzer-benchmark-suite
+ * @author: Suhabe Bugrara
+ */
+
+
+
+
+pragma solidity ^0.4.23;
+
+contract IntegerOverflowMultiTxMultiFuncFeasible {
+ uint256 private initialized = 0;
+ uint256 public count = 1;
+
+ function init() public {
+ initialized = 1;
+ }
+
+ function run(uint256 input) {
+ if (initialized == 0) {
+ return;
+ }
+
+ count = sub(count, input);
+ }
+
+ 
+ function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b <= a);
+ return a - b;
+ }
+}
+
+
+Abstract Vulnerability Description: An arithmetic operation vulnerability exists when subtraction operations are performed without bounds checking, which can lead to unintended wrap-around values due to underflow. This can result in incorrect state modifications and security weaknesses, especially in versions of Solidity prior to 0.8.0 where automatic arithmetic checks are absent.
+
+Trigger Action: The trigger action occurs when a function executes a subtraction operation where the subtractor (input value) is greater than the current count, potentially causing an integer underflow by allowing the value to wrap around to a maximum value.
+
+            Detailed Vulnerability Description: **
+
+In the original code snippet, the potential for an integer underflow exists in the `run` function. Specifically, the line `count -= input` allows for a scenario where `input` could be greater than `count`. If this condition occurs, the subtraction operation would cause the count to "wrap around" the maximum uint256 value, resulting in an incorrectly high value for `count`. This happens because Solidity (especially in versions prior to 0.8.0) doesn't inherently protect against overflow or underflow without employing library functions or external checks, potentially leading to serious logical flaws and security vulnerabilities in the smart contract.
+
+**
+            Solution Description: **
+
+The modification introduces an internal function named `sub` that is designed to handle the subtraction in a safe manner. This function uses a `require` statement: `require(b <= a)`, which effectively prevents the operation if the subtraction would result in an underflow. If `b` (the input value) is greater than `a` (count in this context), the transaction is reverted. This ensures the subtraction is valid and within the range, thereby preventing the unwanted state transition of a wrap-around from underflow.
+
+The introduction of this safeguarded function `sub` is essential in:
+
+1. Enforcing logical correctness by adding a conditional clause that ensures the decrement operation is possible without underflow.
+2. Reverting the transaction in cases where invalid data might lead to negative values, thus preserving the integrity of the contract's state.
+3. Promoting safer arithmetic operations, a practice that is mandatory in preventing such vulnerabilities post-Solidity version 0.8.0, where overflow checks are implemented by default but need to be manually handled in earlier versions as demonstrated.
+

@@ -1,0 +1,194 @@
+vulnerable code:
+pragma solidity ^0.4.25;
+
+/** Taken from the OpenZeppelin github
+ * @title SafeMath
+ * @dev Math operations with safety checks that revert on error
+ */
+library SafeMath {
+
+ /**
+  * @dev Multiplies two numbers, reverts on overflow.
+  */
+ function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+ 
+ 
+ 
+ if (a == 0) {
+ return 0;
+ }
+
+ uint256 c = a * b;
+ require(c / a == b);
+
+ return c;
+ }
+
+ /**
+  * @dev Integer division of two numbers truncating the quotient, reverts on division by zero.
+  */
+ function div(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b > 0); 
+ uint256 c = a / b;
+ 
+
+ return c;
+ }
+
+ /**
+  * @dev Subtracts two numbers, reverts on overflow (i.e. if subtrahend is greater than minuend).
+  */
+ function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b <= a);
+ uint256 c = a - b;
+
+ return c;
+ }
+
+ /**
+  * @dev Adds two numbers, reverts on overflow.
+  */
+ function add(uint256 a, uint256 b) internal pure returns (uint256) {
+ uint256 c = a + b;
+ require(c >= a);
+
+ return c;
+ }
+
+ /**
+  * @dev Divides two numbers and returns the remainder (unsigned integer modulo),
+  * reverts when dividing by zero.
+  */
+ function mod(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b != 0);
+ return a % b;
+ }
+}
+
+
+contract TypoSafeMath {
+
+ using SafeMath for uint256;
+ uint256 public numberOne = 1;
+ bool public win = false;
+
+ function addOne() public {
+ numberOne =+ 1;
+ }
+
+ function addOneCorrect() public {
+ numberOne += 1;
+ }
+
+ function addOneSafeMath() public {
+ numberOne = numberOne.add(1);
+ }
+
+ function iWin() public {
+ if(!win && numberOne>3) {
+ win = true;
+ }
+ }
+}
+
+
+Abstract purpose: This code snippet includes a SafeMath library for performing mathematical calculations safely within a Solidity smart contract.
+
+Detail Behaviors:
+1. Multiplying two numbers with overflow check.
+2. Dividing two numbers with division by zero check.
+3. Subtracting two numbers with overflow check.
+4. Adding two numbers with overflow check.
+5. Dividing two numbers and getting the remainder with division by zero check.
+
+fixed code:
+pragma solidity ^0.4.25;
+
+library SafeMath {
+
+ function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+ if (a == 0) {
+ return 0;
+ }
+ uint256 c = a * b;
+ require(c / a == b);
+ return c;
+ }
+
+ function div(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b > 0);
+ return a / b;
+ }
+
+ function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b <= a);
+ return a - b;
+ }
+
+ function add(uint256 a, uint256 b) internal pure returns (uint256) {
+ uint256 c = a + b;
+ require(c >= a);
+ return c;
+ }
+
+ function mod(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b != 0);
+ return a % b;
+ }
+}
+
+contract TypoSafeMath {
+
+ using SafeMath for uint256;
+ uint256 public numberOne = 1;
+ bool public win = false;
+
+ function addOne() public {
+ numberOne += 1;
+ }
+
+ function addOneCorrect() public {
+ numberOne += 1;
+ }
+
+ function addOneSafeMath() public {
+ numberOne = numberOne.add(1);
+ }
+
+ function iWin() public {
+ if(!win && numberOne > 3) {
+ win = true;
+ }
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability is a typo-related error where an arithmetic operation intended to increment a variable is incorrectly expressed, leading to unintended state assignments. This discrepancy arises from misusing the assignment (`=`) operator in place of the increment operator (`+=`), which affects logical operation flow, potentially leading to incorrect state conditions or thresholds being met prematurely.
+
+Trigger Action: The specific action initiating the vulnerability is the use of a typo in code syntax where an increment operation is mistakenly written, resulting in a re-assignment of the variable with a constant value instead of incrementing it as intended.
+
+            Detailed Vulnerability Description: **
+
+The vulnerability identified is primarily a typographical error concerning the use of assignment and arithmetic operators, often referred to as a "typo vulnerability" or SWC-129 in Smart Contract Weakness Classification. Specifically, this vulnerability arises when:
+
+- An intended increment operation `+=` on a variable is mistakenly written as `=+`, which, instead of incrementing the variable, reassigns it with a unary plus operator. This operator is technically valid but doesn't produce a logical increment, rather it reinitializes the variable to a positive value that directly follows the operator, which is simply a number in this case, altering the intended flow of the contract.
+
+In the original contract, within the `addOne()` function, the code mistakenly uses `numberOne =+ 1;` instead of `numberOne += 1;`. This results in always assigning the value of `1` rather than incrementing `numberOne` by 1. The vulnerability allows malicious or incorrect states, particularly when logic depends on variable increments to reach thresholds or state changes.
+
+**
+            Solution Description: **
+
+The modification involves correcting the erroneous operator to ensure the intended incrementation takes place. The steps taken are as follows:
+
+1. **Correct Usage of Operators:**
+   - Replace `numberOne =+ 1;` with `numberOne += 1;` in the `addOne` function to perform the intended increment operation.
+
+2. **Verification and Testing:**
+   - After correction, the code was tested or documented using control flow tools like Slither to ensure the modification addressed the vulnerability without introducing new errors.
+
+3. **Consistency and Safety Practices:**
+   - By ensuring mathematical operations use the correct forms and are safeguarded with libraries like SafeMath (as showcased in other functions using `add()`, `sub()`, etc.), overflow and underflow errors are prevented. This transformation aids in making contracts robust against both inadvertent developer errors and malicious attempts to exploit such errors.
+
+4. **Deprecated Operator Awareness:**
+   - As newer versions of Solidity deprecate certain operators or construct forms (such as the unary plus), maintaining updated best practices ensures these types of errors are minimized in future development.
+

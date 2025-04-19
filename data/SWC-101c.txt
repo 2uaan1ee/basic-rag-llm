@@ -1,0 +1,67 @@
+vulnerable code:
+
+
+
+pragma solidity ^0.4.19;
+
+contract IntegerOverflowMul {
+ uint public count = 2;
+
+ function run(uint256 input) public {
+ count *= input;
+ }
+}
+
+
+Abstract purpose: The code snippet demonstrates a Solidity smart contract that performs multiplication with overflow check.
+
+Detail Behaviors: 
+1. Declares a state variable 'count' initialized to 2.
+2. Defines a function 'run' that takes an unsigned integer input and multiplies it to the 'count' state variable.
+3. The function performs an unchecked multiplication, which could lead to integer overflow issues.
+
+fixed code:
+
+
+
+
+pragma solidity ^0.4.19;
+
+contract IntegerOverflowMul {
+ uint public count = 2;
+
+ function run(uint256 input) public {
+ count = mul(count, input);
+ }
+
+ 
+ function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+ 
+ 
+ 
+ if (a == 0) {
+ return 0;
+ }
+
+ uint256 c = a * b;
+ require(c / a == b);
+
+ return c;
+ }
+}
+
+
+Abstract Vulnerability Description: An unchecked arithmetic operation leading to overflow can cause incorrect data manipulation in the contract. Specifically, the multiplication of large numerical inputs may exceed the allowable data range and wrap around to start from zero again. Such overflow vulnerabilities can potentially result in erroneous contract states and unauthorized state changes or transfers.
+
+Trigger Action: Execution of an arithmetic multiplication operation where the inputs are sufficiently large so that their product exceeds the maximum value that a uint256 can hold, thereby causing an overflow.
+
+            Detailed Vulnerability Description: - **Arithmetic Overflow:** The initial code allows multiplication of the `count` variable by an unchecked input. If this results in a value exceeding the maximum representable value of a uint256 (2^256 - 1), the value 'wraps around' to start from zero again. This "wrap-around" behavior in arithmetic is termed as overflow.
+- **Impact of Overflow:** In decentralized scenarios, such behavior can be exploited where multiplication results lead to unexpected contract states, enabling unintended financial transfers or state manipulations.
+- **Trigger Condition:** The vulnerable operation is triggered when `input` is such that `count * input` exceeds the maximum uint256 value.
+
+###
+            Solution Description: - **Safe Arithmetic using a Multiplication Function:** The modified contract implements a custom `mul` function to safely multiply two uint256 numbers.
+- **Zero Check:** Before any multiplication, it checks if `a` is zero. If true, the multiplication result is directly set to zero, avoiding unnecessary computation and return errors.
+- **Post-condition Check (Division Check):** After calculating `a * b`, it verifies that dividing `c` by `a` results back in `b`. This ensures that no overflow took place during multiplication. If the condition is not met, the transaction is reverted with a `require` statement.
+- **Using Pure Function:** The `mul` function is defined as `pure`, ensuring it does not modify state and only relies on its inputs to determine output, reinforcing security principles in smart contract development.
+

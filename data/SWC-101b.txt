@@ -1,0 +1,54 @@
+vulnerable code:
+
+
+
+pragma solidity ^0.4.19;
+
+contract IntegerOverflowMinimal {
+ uint public count = 1;
+
+ function run(uint256 input) public {
+ count -= input;
+ }
+}
+
+
+Abstract purpose: Simple smart contract to demonstrate integer underflow vulnerability.
+
+Detail Behaviors: 
+1. Contract initializes a public count variable with a value of 1.
+2. Contains a run function that subtracts the input parameter from the count variable without checking for integer underflow.
+
+fixed code:
+
+
+
+
+pragma solidity ^0.4.19;
+
+contract IntegerOverflowMinimal {
+ uint public count = 1;
+
+ function run(uint256 input) public {
+ count = sub(count,input);
+ }
+
+ 
+ function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+ require(b <= a);
+ return a - b;
+ }
+}
+
+
+Abstract Vulnerability Description: The vulnerability involves an arithmetic operation underflow, a specific case of overflow where subtracting a user-controlled value from a tracked contract state variable without proper validation can result in erroneous computation. This situation occurs when the operation attempts to produce a negative result within an unsigned integer context, leading to a wrap-around to the maximum possible value of the type, thereby causing unintended behavior which could be exploited by malicious users.
+
+Trigger Action: Initiating the vulnerability involves subtracting a user-supplied input from a state variable without validating that the result will remain within the bounds of the unsigned integer type, specifically allowing unguarded arithmetic subtraction of user-controlled input that results in a numeric value below zero.
+
+            Detailed Vulnerability Description: The vulnerability present in the initial code snippet is an example of an integer underflow, a subset of overflow vulnerability described as SWC-101. This occurs because the arithmetic subtraction operation `count -= input;` can result in a negative value which cannot be represented in an unsigned integer (uint) data type in Solidity. Specifically, Solidity uses
+            Solution Description: The provided modification rectifies the mentioned underflow vulnerability by implementing a safeguard function to perform the subtraction operation securely. Specifically, the modification includes defining a helper function `sub(uint256 a, uint256 b)` that ensures the operation does not proceed if it would result in an unintended underflow.
+
+1. **Guard Clause with require():** The `require` statement within the `sub` function checks that `b` is not greater than `a` before proceeding with the subtraction. This acts as a conditional guard, ensuring that an underflow cannot occur.
+
+2. **Guarded Subtraction:** The logic only allows the arithmetic operation `a - b` to proceed if the requirement `b <= a` is fulfilled, preventing any operation that would result in a negative number.
+

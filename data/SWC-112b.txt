@@ -1,0 +1,54 @@
+vulnerable code:
+pragma solidity ^0.4.24;
+
+contract proxy{
+ address owner;
+
+ function proxyCall(address _to, bytes _data) external {
+ require( !_to.delegatecall(_data));
+ }
+ function withdraw() external{
+ require(msg.sender == owner);
+ msg.sender.transfer(address(this).balance);
+ }
+}
+
+/*
+You can't use proxyCall to change the owner address as either:
+
+1) the delegatecall reverts and thus does not change owner
+2) the delegatecall does not revert and therefore will cause the proxyCall to revert and preventing owner from changing
+
+This false positive may seem like a really edge case, however since you can revert data back to proxy this patern is useful for proxy architectures
+*/
+
+
+Abstract purpose: Identifying the limitations of using delegatecall function in a proxy contract for changing the owner address.
+            
+Detail Behaviors: 
+1. The proxyCall function prevents changing the owner address by utilizing delegatecall that reverts if attempted.
+2. The withdraw function allows the owner to withdraw the balance of the contract.
+
+fixed code:
+pragma solidity ^0.4.24;
+
+contract Proxy {
+    address public owner;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Caller is not the owner");
+        _;
+    }
+
+    constructor() public {
+        owner = msg.sender;
+    }
+}
+
+Abstract Vulnerability Description: The vulnerability arises from the improper and unchecked usage of a low-level call function that executes external code while sharing state storage with the calling contract. This can be exploited by malicious actors who direct contract execution flow to an attacker-controlled address, potentially altering key storage variables without adequate validation or restriction mechanisms in place.
+
+Trigger Action: Initiating a call to an external address using an unchecked and potentially dangerous low-level call function, which allows untrusted code execution within the calling contract's context.
+
+            Detailed Vulnerability Description: The vulnerability in the original code primarily stems from the unsafe usage of the `delegatecall` function. `delegatecall` is a low-level function that allows a contract to execute code from another contract in the context of the calling contract, meaning that the called code can alter the storage of the calling contract. This can be exploited if `_to` is an address of a contract with malicious intent to manipulate the state variables of the `proxy` contract, which is not protected adequately. In this example, the `delegatecall` is not only utilized unsafely, requiring the usage of `_to` which could be potentially any address without checks, but is also wrapped in a statement `require(!_to.delegatecall(_data))`, which seeks to revert the proxy operation call if the delegatecall does not revert, essentially attempting to mitigate changes — but it lacks robustness and exposes the functionality to risks if exploited creatively.
+            Solution Description: The modified code introduces several critical security measures. Firstly, it incorporates a new `onlyOwner` modifier that ensures that the function caller must be the contract owner, strictly controlling the contract's accessible operations. By implementing the modifier with a descriptive error message, maintenance and debugging processes are more accessible, which aids in tracing unexpected behaviors to upgrades. Secondly, the constructor sets the deploying entity as the owner, establishing ownership immutability post-deployment. This setup dramatically mitigates unauthorized access risks and privilege escalation through rigorous control of function access. Lastly, by structuring code in this fashion, robust checks are enforced, providing safe access to sensitive operations and mitigating exploitative opportunities through methods like unsafe `delegatecall` usage, securing contract executions more effectively. 
+

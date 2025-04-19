@@ -1,0 +1,62 @@
+vulnerable code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ */
+pragma solidity ^0.4.22;
+
+contract ShaOfShaConcrete{
+
+ mapping(bytes32=>uint) m;
+ uint b;
+
+ constructor(){
+ b = 1;
+ }
+
+ function check(uint x){
+ assert(m[keccak256(abi.encodePacked(x, "B"))] == 0);
+ }
+
+}
+
+
+Abstract purpose: The above code snippet is a solidity smart contract called ShaOfShaConcrete intended to check a certain condition using a mapping.
+
+Detail Behaviors:
+1. Initializes a mapping variable `m` with key type bytes32 to uint.
+2. Sets uint variable `b` to 1 in the constructor.
+3. Contains a function `check(uint x)` that asserts if a specific condition in the mapping `m` is not met.
+
+fixed code:
+/*
+ * @source: ChainSecurity
+ * @author: Anton Permenev
+ * Fixed version replacing assert() with require().
+ */
+pragma solidity ^0.4.22;
+
+contract ShaOfShaConcrete {
+
+    mapping(bytes32 => uint) m;
+    uint b;
+
+    constructor() public {
+        b = 1;
+    }
+
+    function check(uint x) public {
+        require(m[keccak256(abi.encodePacked(x, "B"))] == 0, "Condition failed");
+    }
+}
+
+Abstract Vulnerability Description: The vulnerability arises from improper use of assertion mechanisms intended for invariant conditions, utilizing `assert` for runtime checks in scenarios where failure is plausible under normal operations. This misuse can lead to state reversion without informative error messages, complicating debugging efforts.
+
+Trigger Action: Execution of a condition check using `assert` that can fail under normal contract execution, resulting in state reversion and gas depletion without an accompanying error message.
+
+            Detailed Vulnerability Description: The vulnerability under scrutiny here is classified under SWC-110, which pertains to the misuse of the `assert` function in Solidity. The `assert` function in Solidity is designed to ensure that certain invariants hold true during program execution, primarily for asserting conditions that should never fail if the contract is running correctly. Its failure results in the consumption of all remaining gas, reverting state changes and, crucially, indicating a condition that should have been unreachable under the contract's assumed invariants.
+
+In the original code, we observe `assert` being used in the `check` function to confirm that the value mapped by the hash of the input `x` concatenated with "B" is zero. This could ostensibly fail if an unexpected or erroneous state is reached during execution. Because `assert` does not return any string message upon failure, it lacks specificity for debugging, leaving the contract owner with little to diagnose the failure's cause.
+
+###
+            Solution Description: The resolution involved replacing the `assert` call with a `require` function. Unlike `assert`, `require` is conventionally used to validate inputs and expectations in the contract execution flow. Its failure results in a revert with an error message, which is highly beneficial for debugging because it allows for explicit communication about why the contract execution halted.
