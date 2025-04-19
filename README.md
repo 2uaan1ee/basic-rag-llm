@@ -50,7 +50,7 @@ VULNHUNT_GPT/
 ### 1. Clone repo:
 
 ```bash
-git clone https://github.com/yourusername/vulnhunt-gpt-llm-rag.git
+git clone https://github.com/2uaan1ee/basic-rag-llm.git
 cd vulnhunt-gpt-llm-rag
 ```
 
