@@ -30,8 +30,6 @@ Dự án sử dụng các mô hình ngôn ngữ lớn (LLM) kết hợp với c�
 ```
 VULNHUNT_GPT/
 ├── data/                 # Chứa dữ liệu đầu vào hoặc smart contracts
-├── miai/                 # (Tuỳ chỉnh: có thể chứa AI config hoặc xử lý riêng)
-├── other/                # Mục phụ khác
 ├── rag-venv/             # Virtual environment (nên được gitignore)
 ├── vectorstores/         # Lưu FAISS vector db
 ├── .env                  # File chứa các biến môi trường (API Keys)
@@ -51,12 +49,14 @@ VULNHUNT_GPT/
 
 ```bash
 git clone https://github.com/2uaan1ee/basic-rag-llm.git
-cd vulnhunt-gpt-llm-rag
+cd basic-rag-llm
 ```
 
 ### 2. Cài đặt môi trường:
 
 ```bash
+python -m venv rag-venv
+rag-venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
@@ -121,4 +121,4 @@ Mọi đóng góp, chỉnh sửa hoặc mở rộng dự án đều rất hoan n
 
 ## 📬 Liên hệ
 
-Nếu bạn có thắc mắc, hãy liên hệ qua GitHub Issues hoặc email (tuỳ chọn nếu muốn thêm).
+Nếu bạn có thắc mắc, hãy liên hệ qua GitHub Issues hoặc email quan.minhle26f@gmal.com
