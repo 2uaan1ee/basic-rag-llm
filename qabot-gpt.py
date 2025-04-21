@@ -4,22 +4,15 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain.retrievers.contextual_compression import ContextualCompressionRetriever
-from langchain_community.document_compressors.rankllm_rerank import RankLLMRerank
-import torch
+from langchain_community.retrievers import BM25Retriever
+from langchain.retrievers import EnsembleRetriever
 import os
 from dotenv import load_dotenv
 load_dotenv()
-torch.cuda.empty_cache()
 # Khai báo biến
 pdf_data_path = "data"
 vector_db_path = "vectorstores/db_faiss"
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
-vector_db_path = "vectorstores/db_faiss"
-embedding_model = OpenAIEmbeddings(
-    model="text-embedding-ada-002"
-)
-# Define paths
 vector_db_path = "vectorstores/db_faiss"
 
 # Initialize the LLM
@@ -29,6 +22,9 @@ llm = ChatOpenAI(
     temperature=0.01,
 )
 
+embedding_model = OpenAIEmbeddings(
+    model="text-embedding-ada-002"
+)
 
 # Helper function for printing docs
 def pretty_print_docs(docs):
@@ -76,7 +72,7 @@ def format_docs(docs):
 if __name__ == "__main__":
     # Load the FAISS vector store
     db = read_vector_db()
-
+    
     # Load all .txt files from the 'data' directory
     data_dir = "data"
     documents = []
@@ -95,56 +91,78 @@ if __name__ == "__main__":
 
     # Create embeddings and retriever
     embedding = OpenAIEmbeddings(model="text-embedding-ada-002")
-    retriever = FAISS.from_documents(texts, embedding).as_retriever(search_kwargs={"k": 20})
-
+    retriever = FAISS.from_documents(texts, embedding).as_retriever(
+        search_kwargs={"k": 30}
+    )
+    bm25_retriever = BM25Retriever.from_documents(texts)
+    bm25_retriever.k = 10  # Retrieve top 10 results
     query = """
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+    // SPDX-License-Identifier: MIT
+    pragma solidity ^0.8.20;
 
-contract HelloWorld {
+    contract HelloWorld {
 
-    string public greeting;
+        string public greeting;
 
-    // Constructor to set the initial greeting message
-    constructor() {
-        greeting = "Hello, World!";
+        // Constructor to set the initial greeting message
+        constructor() {
+            greeting = "Hello, World!";
+        }
+
+        // Function to get the greeting message
+        function getGreeting() public view returns (string memory) {
+            return greeting;
+        }
+
+        // Function to change the greeting message
+        function setGreeting(string memory newGreeting) public {
+            greeting = newGreeting;
+        }
     }
 
-    // Function to get the greeting message
-    function getGreeting() public view returns (string memory) {
-        return greeting;
-    }
 
-    // Function to change the greeting message
-    function setGreeting(string memory newGreeting) public {
-        greeting = newGreeting;
-    }
-}
-
-
-        What is the vulnerabilities of this code? Give me solutions.
+    What is the vulnerabilities of this code? Give me solutions.
     """
 
     # Define the prompt template
+    # Prompt template
     template = '''
     Known information: 
     {context}
+
     Based on the above known information in your vector database, respond to the user's question concisely and professionally. 
-    If an answer cannot be derived from it, say 'The question cannot be answered with the given information' or 'Not enough relevant information has been provided,'. 
-    Please respond in English. The question is 
-    {question}
+    If an answer cannot be derived from it, say 'The question cannot be answered with the given information' or 'Not enough relevant information has been provided'. 
+    Please respond in English.
+
+    The question is: {question}
+
     Answer:
     '''
-    prompt = create_prompt(template)
 
-    compressor = RankLLMRerank(top_n=3, model="gpt", gpt_model="gpt-4o-mini")
-    compression_retriever = ContextualCompressionRetriever(
-        base_compressor=compressor, base_retriever=retriever
+    prompt = PromptTemplate(
+        input_variables=["context", "question"],
+        template=template
     )
-    compressed_docs = compression_retriever.invoke(query)
-    chain = RetrievalQA.from_chain_type(
-        llm=ChatOpenAI(temperature=0), retriever=compression_retriever
+    ensemble_retriever = EnsembleRetriever(
+        retrievers=[bm25_retriever, retriever], 
+        weights=[0.2, 0.8]
     )
-    response = chain.invoke({"query": query})
-    print(response)
-    pretty_print_docs(compressed_docs)
+    
+    # Create the cohere rag retriever using the chat model
+    docs = ensemble_retriever.invoke(query)
+    qa = RetrievalQA.from_llm(
+        llm=llm,
+        retriever=ensemble_retriever,
+        prompt=prompt,
+        return_source_documents=True
+    )
+    result = qa.invoke({"query": query})
+    print("\nAnswer:\n", result["result"])
+    '''
+    print("\nSource documents:\n")
+    for doc in result["source_documents"]:
+        print(doc.metadata)
+        print(doc.page_content)
+        print("-" * 50)
+    '''
+    

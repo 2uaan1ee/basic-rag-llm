@@ -1,26 +1,27 @@
 from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
-from langchain_community.embeddings import OpenAIEmbeddings
-from langchain_community.retrievers import BM25Retriever
-from langchain.retrievers import EnsembleRetriever
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain.chains import RetrievalQA
-from dotenv import load_dotenv
+from langchain_community.retrievers import BM25Retriever
+from langchain.retrievers import EnsembleRetriever
+import torch
 import os
-from llm_model import get_hf_llm
-# Load environment variables
+from dotenv import load_dotenv
 load_dotenv()
+# Khai báo biến
 pdf_data_path = "data"
 vector_db_path = "vectorstores/db_faiss"
-embedding_model = OpenAIEmbeddings(
-    model="text-embedding-ada-002"
-)
-
-api_key_openai = os.getenv("OPENAI_API_KEY")
+os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+vector_db_path = "vectorstores/db_faiss"
 
 # Initialize the LLM
-llm = get_hf_llm(temperature=0.01)
+llm = ChatOpenAI(
+    openai_api_key=os.environ.get("OPENAI_API_KEY"),
+    model_name="gpt-4o-2024-08-06",
+    temperature=0.01,
+)
 
 embedding_model = OpenAIEmbeddings(
     model="text-embedding-ada-002"
@@ -68,7 +69,7 @@ def format_docs(docs):
     )
     return formatted
 
-
+# Main logic
 if __name__ == "__main__":
     # Load the FAISS vector store
     db = read_vector_db()
@@ -90,12 +91,11 @@ if __name__ == "__main__":
         text.metadata["id"] = idx
 
     # Create embeddings and retriever
-    embedding = OpenAIEmbeddings(model="text-embedding-ada-002")
-    retriever = FAISS.from_documents(texts, embedding).as_retriever(
-        search_kwargs={"k": 30}
-    )
     bm25_retriever = BM25Retriever.from_documents(texts)
-    bm25_retriever.k = 10  # Retrieve top 10 results
+    bm25_retriever.k = 2  # Retrieve top 2 results
+    embedding = OpenAIEmbeddings(model="text-embedding-ada-002")
+    retriever = FAISS.from_documents(texts, embedding).as_retriever(search_kwargs={"k": 20})
+
     query = """
     // SPDX-License-Identifier: MIT
     pragma solidity ^0.8.20;
@@ -125,36 +125,41 @@ if __name__ == "__main__":
     """
 
     # Define the prompt template
-    # Prompt template
     template = '''
     Known information: 
     {context}
-
     Based on the above known information in your vector database, respond to the user's question concisely and professionally. 
-    If an answer cannot be derived from it, say 'The question cannot be answered with the given information' or 'Not enough relevant information has been provided'. 
-    Please respond in English.
-
-    The question is: {question}
-
+    If an answer cannot be derived from it, say 'The question cannot be answered with the given information' or 'Not enough relevant information has been provided,'. 
+    Please respond in English. The question is 
+    {question}
     Answer:
     '''
+    prompt = create_prompt(template)
 
-    prompt = PromptTemplate(
-        input_variables=["context", "question"],
-        template=template
-    )
     ensemble_retriever = EnsembleRetriever(
-        retrievers=[bm25_retriever, retriever], 
-        weights=[0.2, 0.8]
+        retrievers=[bm25_retriever, retriever], weights=[0.2, 0.8]
     )
     
     # Create the cohere rag retriever using the chat model
     docs = ensemble_retriever.invoke(query)
-    qa = RetrievalQA.from_llm(
-        llm=llm,
-        retriever=ensemble_retriever,
-        prompt=prompt,
-        return_source_documents=True
+    qa = RetrievalQA.from_chain_type(
+        llm=llm, 
+        chain_type="stuff", 
+        retriever=ensemble_retriever
     )
-    result = qa.invoke({"query": query})
-    print("\nAnswer:\n", result["result"])
+    res = qa.invoke(query)
+    print(res)
+    # Print the documents
+    print("Documents:")
+    for doc in docs[:-1]:
+        print(doc.metadata)
+        print("\n\n" + doc.page_content)
+        print("\n\n" + "-" * 20 + "\n\n")
+    # Print the final generation
+    answer = doc[-1].page_content
+    print("Answer:")
+    print(answer)
+    # Print the final citations
+    citations = doc[-1].metadata["citations"]
+    print("Citations:")
+    print(citations)
