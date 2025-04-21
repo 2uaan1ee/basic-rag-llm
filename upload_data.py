@@ -8,7 +8,7 @@ load_dotenv()
 # Khai báo biến
 pdf_data_path = "data"
 vector_db_path = "vectorstores/db_faiss"
-os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 def create_db_from_text():
     raw_text = """
@@ -30,7 +30,8 @@ def create_db_from_text():
     chunks = text_splitter.split_text(raw_text)
     print(chunks)
     embedding_model = OpenAIEmbeddings(
-        model="text-embedding-ada-002"
+        model="text-embedding-ada-002",
+        api_key=OPENAI_API_KEY
     )
     embeddings = [embedding_model.embed_documents(chunk) for chunk in chunks]
     print("Embeddings:", embeddings)
@@ -58,7 +59,8 @@ def create_db_from_files():
     print(document.metadata)
 
     embedding_model = OpenAIEmbeddings(
-        model="text-embedding-ada-002"
+        model="text-embedding-ada-002",
+        api_key=OPENAI_API_KEY
     )
 
     # Generate embeddings for each chunk

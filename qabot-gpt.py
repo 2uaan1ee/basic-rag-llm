@@ -1,12 +1,16 @@
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-import os
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough, RunnableParallel
+from langchain_community.document_loaders import TextLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.retrievers.contextual_compression import ContextualCompressionRetriever
+from langchain_community.document_compressors.rankllm_rerank import RankLLMRerank
+import torch
+import os
 from dotenv import load_dotenv
 load_dotenv()
+torch.cuda.empty_cache()
 # Khai báo biến
 pdf_data_path = "data"
 vector_db_path = "vectorstores/db_faiss"
@@ -15,7 +19,6 @@ vector_db_path = "vectorstores/db_faiss"
 embedding_model = OpenAIEmbeddings(
     model="text-embedding-ada-002"
 )
-
 # Define paths
 vector_db_path = "vectorstores/db_faiss"
 
@@ -25,6 +28,15 @@ llm = ChatOpenAI(
     model_name="gpt-4o-2024-08-06",
     temperature=0.01,
 )
+
+
+# Helper function for printing docs
+def pretty_print_docs(docs):
+    print(
+        f"\n{'-' * 100}\n".join(
+            [f"Document {i + 1}:\n\n" + d.page_content for i, d in enumerate(docs)]
+        )
+    )
 
 # Function to create a prompt
 def create_prompt(template):
@@ -65,8 +77,25 @@ if __name__ == "__main__":
     # Load the FAISS vector store
     db = read_vector_db()
 
-    # Create a retriever
-    retriever = db.as_retriever(search_kwargs={"k": 3})
+    # Load all .txt files from the 'data' directory
+    data_dir = "data"
+    documents = []
+    for file_name in os.listdir(data_dir):
+        if file_name.endswith(".txt"):
+            file_path = os.path.join(data_dir, file_name)
+            documents.extend(TextLoader(file_path).load())
+
+    # Split documents into chunks
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=256)
+    texts = text_splitter.split_documents(documents)
+
+    # Add metadata to each chunk
+    for idx, text in enumerate(texts):
+        text.metadata["id"] = idx
+
+    # Create embeddings and retriever
+    embedding = OpenAIEmbeddings(model="text-embedding-ada-002")
+    retriever = FAISS.from_documents(texts, embedding).as_retriever(search_kwargs={"k": 20})
 
     query = """
 // SPDX-License-Identifier: MIT
@@ -97,7 +126,6 @@ contract HelloWorld {
     """
 
     # Define the prompt template
-    # Define the prompt template
     template = '''
     Known information: 
     {context}
@@ -109,16 +137,14 @@ contract HelloWorld {
     '''
     prompt = create_prompt(template)
 
-    # Create the QA chain
-    qa_chain = create_qa_chain(prompt, llm, retriever)
-
-    # Example query
-    result = qa_chain({"query": query})
-
-    # Display the answer and sources
-    print("Answer:", result["result"])
-    print("\nSources:")
-    for doc in result["source_documents"]:
-        print(f"Source: {doc.metadata.get('source', 'Unknown')}")
-        print(f"Content: {doc.page_content}")
-        print("-----------")
+    compressor = RankLLMRerank(top_n=3, model="gpt", gpt_model="gpt-4o-mini")
+    compression_retriever = ContextualCompressionRetriever(
+        base_compressor=compressor, base_retriever=retriever
+    )
+    compressed_docs = compression_retriever.invoke(query)
+    chain = RetrievalQA.from_chain_type(
+        llm=ChatOpenAI(temperature=0), retriever=compression_retriever
+    )
+    response = chain.invoke({"query": query})
+    print(response)
+    pretty_print_docs(compressed_docs)

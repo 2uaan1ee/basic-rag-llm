@@ -32,3 +32,4 @@ tqdm
 transformers
 typing_extensions
 typing-inspect   
+rank-llm
