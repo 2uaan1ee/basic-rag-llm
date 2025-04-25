@@ -10,10 +10,8 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 # Khai báo biến
-pdf_data_path = "data"
 vector_db_path = "vectorstores/db_faiss"
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
-vector_db_path = "vectorstores/db_faiss"
 
 # Initialize the LLM
 llm = ChatOpenAI(
@@ -38,17 +36,6 @@ def pretty_print_docs(docs):
 def create_prompt(template):
     prompt = PromptTemplate(template=template, input_variables=["context", "question"])
     return prompt
-
-# Function to create a QA chain
-def create_qa_chain(prompt, llm, retriever):
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=retriever,
-        return_source_documents=True,  # Ensure source documents are returned
-        chain_type_kwargs={"prompt": prompt},
-    )
-    return qa_chain
 
 # Function to read the FAISS vector database
 def read_vector_db():

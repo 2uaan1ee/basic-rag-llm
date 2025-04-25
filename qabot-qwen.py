@@ -8,7 +8,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.chains import RetrievalQA
 from dotenv import load_dotenv
 import os
-from llm_model import get_hf_llm
+from app.llms.llm_model import get_hf_llm
 # Load environment variables
 load_dotenv()
 pdf_data_path = "data"

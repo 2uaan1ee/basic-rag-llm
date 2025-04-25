@@ -34,3 +34,7 @@ typing_extensions
 typing-inspect   
 rank-llm
 rank_bm25
+langserve 
+fastapi 
+uvicorn
+langsmith
