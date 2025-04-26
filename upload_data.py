@@ -42,9 +42,8 @@ def create_db_from_text():
 def create_db_from_files():
     # Khởi tạo document loader
     loader = DirectoryLoader(path=pdf_data_path, glob="*.txt", loader_cls=TextLoader)
-    # Load tài liệu từ PDF
     documents = loader.load()
-    
+
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1024,
         chunk_overlap=256,
@@ -63,15 +62,8 @@ def create_db_from_files():
         api_key=OPENAI_API_KEY
     )
 
-    # Generate embeddings for each chunk
-    texts = [chunk.page_content for chunk in chunks]
-
-    # Generate embeddings for each chunk
-    embeddings = embedding_model.embed_documents(texts)
-    print("Embeddings:", embeddings)
-
-    # Create FAISS vector store
-    db = FAISS.from_texts(texts=texts, embedding=embedding_model)
+    # Tạo FAISS vector store từ các Document đã split
+    db = FAISS.from_documents(chunks, embedding_model)
     db.save_local(vector_db_path)
     print("Successfully created and saved FAISS vector store")
     return db

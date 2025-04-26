@@ -57,59 +57,14 @@ def format_docs(docs):
 
 # Main logic
 if __name__ == "__main__":
-    # Load the FAISS vector store
-    db = read_vector_db()
-    
-    # Load all .txt files from the 'data' directory
-    data_dir = "data"
-    documents = []
-    for file_name in os.listdir(data_dir):
-        if file_name.endswith(".txt"):
-            file_path = os.path.join(data_dir, file_name)
-            documents.extend(TextLoader(file_path).load())
-
-    # Split documents into chunks
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=256)
-    texts = text_splitter.split_documents(documents)
-
-    # Add metadata to each chunk
-    for idx, text in enumerate(texts):
-        text.metadata["id"] = idx
-
-    # Create embeddings and retriever
-    embedding = OpenAIEmbeddings(model="text-embedding-ada-002")
-    retriever = FAISS.from_documents(texts, embedding).as_retriever(
-        search_kwargs={"k": 30}
-    )
-    bm25_retriever = BM25Retriever.from_documents(texts)
-    bm25_retriever.k = 10  # Retrieve top 10 results
-    query = """
-    // SPDX-License-Identifier: MIT
-    pragma solidity ^0.8.20;
-
-    contract HelloWorld {
-
-        string public greeting;
-
-        // Constructor to set the initial greeting message
-        constructor() {
-            greeting = "Hello, World!";
-        }
-
-        // Function to get the greeting message
-        function getGreeting() public view returns (string memory) {
-            return greeting;
-        }
-
-        // Function to change the greeting message
-        function setGreeting(string memory newGreeting) public {
-            greeting = newGreeting;
-        }
-    }
-
-
-    What is the vulnerabilities of this code? Give me solutions.
-    """
+    print("Your input here:")
+    lines = []
+    while True:
+        line = input()
+        if line == "":
+            break
+        lines.append(line)
+    query = "\n".join(lines)
 
     # Define the prompt template
     # Prompt template
@@ -126,13 +81,38 @@ if __name__ == "__main__":
     Answer:
     '''
 
+    # Load the FAISS vector store
+    db = read_vector_db()
+    
+    # Load all .txt files from the 'data' directory
+    data_dir = "data"
+    documents = []
+    for file_name in os.listdir(data_dir):
+        if file_name.endswith(".txt"):
+            file_path = os.path.join(data_dir, file_name)
+            documents.extend(TextLoader(file_path).load())
+
+    # Split documents into chunks
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=25600, chunk_overlap=0)
+    texts = text_splitter.split_documents(documents)
+
+    # Add metadata to each chunk
+    for idx, text in enumerate(texts):
+        text.metadata["id"] = idx
+
+    # Create embeddings and retriever
+    faiss_retriever = db.as_retriever(search_kwargs={"k": 30}) 
+    bm25_retriever = BM25Retriever.from_documents(texts)
+    bm25_retriever.k = 10  # Retrieve top 10 results
+    
+    ensemble_retriever = EnsembleRetriever(
+        retrievers=[bm25_retriever, faiss_retriever], 
+        weights=[0.2, 0.8]
+    )
+
     prompt = PromptTemplate(
         input_variables=["context", "question"],
         template=template
-    )
-    ensemble_retriever = EnsembleRetriever(
-        retrievers=[bm25_retriever, retriever], 
-        weights=[0.2, 0.8]
     )
     
     # Create the cohere rag retriever using the chat model
@@ -145,6 +125,10 @@ if __name__ == "__main__":
     )
     result = qa.invoke({"query": query})
     print("\nAnswer:\n", result["result"])
+    print("Ensemble retriever details:")
+    for i, retr in enumerate(ensemble_retriever.retrievers):
+        print(f"  Retriever {i+1}: {retr}")
+    print("Weights:", ensemble_retriever.weights)
     '''
     print("\nSource documents:\n")
     for doc in result["source_documents"]:
