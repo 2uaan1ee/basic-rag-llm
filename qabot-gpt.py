@@ -125,10 +125,6 @@ if __name__ == "__main__":
     )
     result = qa.invoke({"query": query})
     print("\nAnswer:\n", result["result"])
-    print("Ensemble retriever details:")
-    for i, retr in enumerate(ensemble_retriever.retrievers):
-        print(f"  Retriever {i+1}: {retr}")
-    print("Weights:", ensemble_retriever.weights)
     '''
     print("\nSource documents:\n")
     for doc in result["source_documents"]:
