@@ -5,58 +5,46 @@ from langchain.prompts import PromptTemplate
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.retrievers import BM25Retriever
-from langchain.retrievers import EnsembleRetriever
 import os
 from dotenv import load_dotenv
+
+# Load environment variables
 load_dotenv()
-# Khai báo biến
-vector_db_path = "vectorstores/db_faiss"
-os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+VECTOR_DB_PATH = "vectorstores/db_faiss"
 
-# Initialize the LLM
-llm = ChatOpenAI(
-    openai_api_key=os.environ.get("OPENAI_API_KEY"),
-    model_name="gpt-4o-2024-08-06",
-    temperature=0.01,
-)
-
-embedding_model = OpenAIEmbeddings(
-    model="text-embedding-ada-002"
-)
-
-# Helper function for printing docs
-def pretty_print_docs(docs):
-    print(
-        f"\n{'-' * 100}\n".join(
-            [f"Document {i + 1}:\n\n" + d.page_content for i, d in enumerate(docs)]
-        )
+def llm():
+    llm = ChatOpenAI(
+        openai_api_key=os.environ.get("OPENAI_API_KEY"),
+        model_name="gpt-4o-2024-08-06",
+        temperature=0.01,
     )
+    return llm
 
-# Function to create a prompt
-def create_prompt(template):
-    prompt = PromptTemplate(template=template, input_variables=["context", "question"])
-    return prompt
-
-# Function to read the FAISS vector database
-def read_vector_db():
+def embedding_model():
     embedding_model = OpenAIEmbeddings(model="text-embedding-ada-002")
+    return embedding_model
+
+def read_vector_db():
     db = FAISS.load_local(
-        folder_path=vector_db_path,
+        folder_path=VECTOR_DB_PATH,
         embeddings=embedding_model,
-        allow_dangerous_deserialization=True,  # Add this parameter for compatibility
+        allow_dangerous_deserialization=True,
     )
     return db
 
-# Function to format retrieved documents
-def format_docs(docs):
-    formatted = "\n\n".join(
-        f"Source: {doc.metadata.get('source', 'Unknown')}\nContent: {doc.page_content}"
-        for doc in docs
-    )
-    return formatted
+def load_and_split_documents(data_dir):
+    documents = []
+    for file_name in os.listdir(data_dir):
+        if file_name.endswith(".txt"):
+            file_path = os.path.join(data_dir, file_name)
+            documents.extend(TextLoader(file_path).load())
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=0)
+    texts = text_splitter.split_documents(documents)
+    for idx, text in enumerate(texts):
+        text.metadata["id"] = idx
+    return texts
 
-# Main logic
-if __name__ == "__main__":
+def response_llm():
     print("Your input here:")
     lines = []
     while True:
@@ -66,70 +54,35 @@ if __name__ == "__main__":
         lines.append(line)
     query = "\n".join(lines)
 
-    # Define the prompt template
-    # Prompt template
     template = '''
     Known information: 
     {context}
-
-    Based on the above known information in your vector database, respond to the user's question concisely and professionally. 
-    If an answer cannot be derived from it, say 'The question cannot be answered with the given information' or 'Not enough relevant information has been provided'. 
+    You are an AI Auditor about the Smart Contract Vulnerabilities. Based on the above known information in your vector database, respond to the user's question concisely and professionally. 
+    If the smart contract is not has vulnerabilities, please answer "It works, no vulnerabilities found". 
     Please respond in English.
-
     The question is: {question}
-
     Answer:
     '''
 
-    # Load the FAISS vector store
     db = read_vector_db()
-    
-    # Load all .txt files from the 'data' directory
-    data_dir = "data"
-    documents = []
-    for file_name in os.listdir(data_dir):
-        if file_name.endswith(".txt"):
-            file_path = os.path.join(data_dir, file_name)
-            documents.extend(TextLoader(file_path).load())
 
-    # Split documents into chunks
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=25600, chunk_overlap=0)
-    texts = text_splitter.split_documents(documents)
-
-    # Add metadata to each chunk
-    for idx, text in enumerate(texts):
-        text.metadata["id"] = idx
-
-    # Create embeddings and retriever
-    faiss_retriever = db.as_retriever(search_kwargs={"k": 30}) 
-    bm25_retriever = BM25Retriever.from_documents(texts)
-    bm25_retriever.k = 10  # Retrieve top 10 results
-    
-    ensemble_retriever = EnsembleRetriever(
-        retrievers=[bm25_retriever, faiss_retriever], 
-        weights=[0.2, 0.8]
-    )
+    # Compression retriever
+    faiss_retriever = db.similarity_search(query=query, k=30)
+    bm25_retriever = BM25Retriever.from_documents(faiss_retriever, k=10)
 
     prompt = PromptTemplate(
         input_variables=["context", "question"],
         template=template
     )
-    
-    # Create the cohere rag retriever using the chat model
-    docs = ensemble_retriever.invoke(query)
+
     qa = RetrievalQA.from_llm(
-        llm=llm,
-        retriever=ensemble_retriever,
+        llm=llm(),
+        retriever=bm25_retriever,
         prompt=prompt,
-        return_source_documents=True
+        return_source_documents=False
     )
     result = qa.invoke({"query": query})
     print("\nAnswer:\n", result["result"])
-    '''
-    print("\nSource documents:\n")
-    for doc in result["source_documents"]:
-        print(doc.metadata)
-        print(doc.page_content)
-        print("-" * 50)
-    '''
-    
+
+if __name__ == "__main__":
+    response_llm()
